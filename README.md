@@ -4,6 +4,8 @@ This document lists some common configuration on Aspera HSTS.
 
 All can be scripted, but for the sake of education, this is done step by step.
 
+<https://ibmaspera.com/help/attach_cloud_local_storage>
+
 ## Configuration as tethered node in AoC
 
 ### Pre-requisites
@@ -12,8 +14,8 @@ In order to tether a self-managed node to Aspera on Cloud, the following are req
 
 - A self-managed system with admin access, typically a Linux Virtual Machine
 - A public IP address where this machine is reachable on a minimum of 2 TCP ports and 1 UDP port
-- A DNS A record (FQDN) for that IP address (or use freedns)
-- A TLS certificate for that FQDN (or use letsencypt: requires port TCP/443)
+- A DNS A record (FQDN) for that IP address (or use freedns, see below)
+- A TLS certificate for that FQDN (or use letsencypt see below: requires port TCP/443)
 - The installation package for HSTS: for example:
 
   `ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm`
@@ -21,6 +23,12 @@ In order to tether a self-managed node to Aspera on Cloud, the following are req
 - An evaluation license file. For example:
 
   `87650-AsperaEnterprise-unlim.eval.aspera-license`
+
+### DNS record
+
+A FQDN (DNS A Record) is required for the public address.
+
+If none is defined, it is possible to use a free service like [freedns](https://freedns.afraid.org/) for that.
 
 ### Installation and configuration of tethered node
 
@@ -46,10 +54,11 @@ aspera_eval_lic=./87650-AsperaEnterprise-unlim.eval.aspera-license
 aspera_os_user=xfer
 aspera_home=/home/$aspera_os_user
 aspera_storage_root=$aspera_home/aoc
+aspera_cert_email=john@example.com
+aspera_fqdn=itzvsi-f0pjbk8h.mojok.org
+aspera_node_port=9092
 aspera_node_user=node_admin
 aspera_node_pass=$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)
-aspera_cert_email=john@example.com
-aspera_fqdn=laurenttest1.chickenkiller.com
 set|grep ^aspera_ > $variables_file
 PATH=/opt/aspera/bin:/usr/local/bin:$PATH
 echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> $variables_file
@@ -75,6 +84,8 @@ timedatectl set-timezone Europe/Paris
 #### Install the Aspera CLI
 
 Not mandatory per se, but convenient.
+
+This can alternatively be installed on the laptop instead. <https://github.com/IBM/aspera-cli>
 
 ```bash
 dnf module -y reset ruby
@@ -204,6 +215,7 @@ Aspera on Cloud requires activity logging:
 ```bash
 asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,true;activity_file_event_logging,true;activity_bandwidth_logging,true'
 asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true'
+asconfigurator -x "set_server_data;files_recursive_counts_workers,3"
 ```
 
 #### Node API user
@@ -236,9 +248,6 @@ In order to work with Aspera on Cloud, it is required to have a public IP addres
 | TCP/33001 | FASP Session (SSH) |
 | UDP/33001 | FASP Data |
 | TCP/443   | Node API (HTTPS) |
-
-In addition, a FQDN (DNS A Record) is also required for this address.
-If none is defined, it is possible to use a free service like [freedns](https://freedns.afraid.org/) for that.
 
 Once the DNS name is known:
 
@@ -282,8 +291,7 @@ dnf install -y nginx
 Since we use nginx as reverse proxy, we can make node api listen locally only:
 
 ```bash
-node_listen_port=9092
-asconfigurator -x "set_server_data;listen,127.0.0.1:${node_listen_port}s"
+asconfigurator -x "set_server_data;listen,127.0.0.1:${aspera_node_port}s"
 systemctl restart asperanoded
 ```
 
@@ -292,7 +300,7 @@ systemctl restart asperanoded
 ```bash
 cat<<EOF > /etc/nginx/conf.d/aspera.conf
 server {
-  set                        \$node_port 9092;
+  set                        \$node_port $aspera_node_port;
   listen                     443 ssl;
   listen                     [::]:443 ssl;
   server_name                _;
@@ -326,4 +334,30 @@ Then enable it:
 
 ```bash
 systemctl enable --now nginx
+```
+
+### Declaration in AoC
+
+Go to Admin app, in nodes and storage.
+Add new node.
+`Attach my Aspera server`
+
+- Name: anything
+- URL: value of: `https://$aspera_fqdn`
+- `Create new access key`
+- Node username: `$aspera_node_user`
+- Node password: `$aspera_node_pass`
+- Storage: Local Storage
+- Path: `$aspera_storage_root/`
+
+Alternatively, create the access key with ascli:
+
+First configure:
+
+```bash
+ascli conf preset update node_admin --url=https://$aspera_fqdn --username=$aspera_node_user --password=$aspera_node_pass
+```
+
+```bash
+ascli node -Pnode_admin access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes | tee my_ak.txt
 ```
