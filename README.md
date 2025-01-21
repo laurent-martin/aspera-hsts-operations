@@ -1,6 +1,8 @@
 # IBM Aspera HSTS Operations
 
-This document lists some common configuration on Aspera HSTS
+This document lists some common configuration on Aspera HSTS.
+
+All can be scripted, but for the sake of education, this is done step by step.
 
 ## Configuration as tethered node in AoC
 
@@ -32,6 +34,8 @@ We assume here that a compatible Virtual Machine (or physical) is installed with
 > For example we will use `tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40` to generate a 40 character random string.
 > We could also use `openssl rand -base64 40|head -c 40` for the same.
 
+#### Parameters
+
 For convenience, let's create a shell config file with parameters used:
 
 ```bash
@@ -44,9 +48,11 @@ aspera_home=/home/$aspera_os_user
 aspera_storage_root=$aspera_home/aoc
 aspera_node_user=node_admin
 aspera_node_pass=$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)
-PATH=/opt/aspera/bin:$PATH
+aspera_cert_email=john@example.com
+aspera_fqdn=laurenttest1.chickenkiller.com
 set|grep ^aspera_ > $variables_file
-echo 'PATH=/opt/aspera/bin:$PATH' >> $variables_file
+PATH=/opt/aspera/bin:/usr/local/bin:$PATH
+echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> $variables_file
 ```
 
 At any time, if you open a new terminal, you can reload the configuration variables with:
@@ -56,15 +62,35 @@ variables_file=/root/aspera_vars.sh
 source $variables_file
 ```
 
-Install the HSTS software:
+#### Install the Aspera CLI
+
+Not mandatory per se, but convenient.
 
 ```bash
-rpm -Uvh --nodeps $aspera_rpm
+dnf module -y reset ruby
+dnf module -y enable ruby:3.3
+dnf install -y ruby-devel
+gem install aspera-cli
 ```
 
-> **Note:** `--nodeps` is to avoid having to install `perl`.
+Check availability with:
 
-Install the license file in `/opt/aspera/etc/aspera-license`.
+```bash
+ascli -v
+```
+
+#### Install the HSTS software
+
+```bash
+dnf install -y perl
+rpm -Uvh $aspera_rpm
+```
+
+> **Note:** `perl` is still required by HSTS installer, but also later by `nginx`.
+
+#### Install the license file
+
+It goes to `/opt/aspera/etc/aspera-license`.
 This file must be world-readable, or at least readable by `asperadaemons` and transfer users.
 
 ```bash
@@ -72,12 +98,18 @@ cp $aspera_eval_lic /opt/aspera/etc/aspera-license
 chmod a+r /opt/aspera/etc/aspera-license
 ```
 
+#### Declare Aspera shell
+
+> **Note:** Optional, but removes some warnings.
+
 As Aspera uses SSH by default, a protection is provided with a secure shell: `aspshell`.
 This shell can be declared as legitimate shell to avoid warning messages (optinal):
 
 ```bash
 grep -qxF '/bin/aspshell' /etc/shells || echo '/bin/aspshell' >> /etc/shells
 ```
+
+#### Create transfer user
 
 When used with AoC, only one transfer user is used: `xfer`.
 Optionally we can create a group.
@@ -91,6 +123,8 @@ passwd --lock $aspera_os_user
 chage --mindays 0 --maxdays 99999 --inactive -1 --expiredate -1 $aspera_os_user
 ```
 
+#### Configure token encryption key
+
 For a PoC, it can be easier to use a static token encryption key:
 
 ```bash
@@ -98,7 +132,7 @@ asconfigurator -x 'set_node_data;token_dynamic_key,false'
 asconfigurator -x "set_node_data;token_encryption_key,$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)"
 ```
 
-If you prefer to use dynamic keys (skip this part if you like KISS):
+If you prefer to use dynamic keys (**skip** this part if you like KISS):
 
 ```bash
 asconfigurator -x 'set_node_data;token_dynamic_key,true'
@@ -107,7 +141,7 @@ tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40|askmscli -rs redis-primary-key
 askmscli --init-keystore --user=$aspera_os_user
 ```
 
-Configure this transfer user for use with tokens:
+#### Configure the transfer user for use with tokens
 
 ```bash
 mkdir -p $aspera_home/.ssh
@@ -115,6 +149,8 @@ cp /opt/aspera/var/aspera_tokenauth_id_rsa.pub $aspera_home/.ssh/authorized_keys
 chmod -R go-rwx $aspera_home/.ssh
 chown -R $aspera_os_user: $aspera_home
 ```
+
+#### Define storage location root
 
 Let's define the main storage location:
 
@@ -124,6 +160,8 @@ chown $aspera_os_user: $aspera_storage_root
 asconfigurator -x "set_user_data;user_name,xfer;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
 ```
 
+#### Other configuration for AoC
+
 Aspera on Cloud requires activity logging:
 
 ```bash
@@ -131,9 +169,99 @@ asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,
 asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true'
 ```
 
+#### Node API user
+
 Let's create a node API user and save the credentials:
 
 ```bash
 /opt/aspera/bin/asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
+```
+
+#### SSH confguration
+
+Let's configure SSH to also listen on port 33001:
+
+```bash
+sed -i '/^#Port 22$/a Port 33001' /etc/ssh/sshd_config
+sed -i '/^#UseDNS yes$/a UseDNS no' /etc/ssh/sshd_config
+sed -i '/^HostKey .*ecdsa_key$/s/^/#/ ' /etc/ssh/sshd_config
+sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
+update-crypto-policies --set LEGACY
+systemctl restart sshd
+```
+
+#### Public IP and DNS
+
+In order to work with Aspera on Cloud, it is required to have a public IP address on which the following ports are open:
+
+| Port | Usage |
+|------|-------|
+| TCP/33001 | FASP Session (SSH) |
+| UDP/33001 | FASP Data |
+| TCP/443   | Node API (HTTPS) |
+
+In addition, a FQDN (DNS A Record) is also required for this address.
+If none is defined, it is possible to use a free service like freedns for that.
+
+#### Certificate
+
+A TLS certificate is required for above FQDN.
+If you don't have one, then it is possible to generate one with below procedure using Letsencrypt:
+
+Install `certbot`:
+
+```bash
+dnf install -y python3.12
+python3 -m venv /opt/certbot/
+/opt/certbot/bin/pip install --upgrade pip
+/opt/certbot/bin/pip install certbot
+ln -s /opt/certbot/bin/certbot /usr/bin/certbot
+```
+
+```bash
+certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --standalone
+```
+
+#### Nginx
+
+Per se, nginx is not required, but that simplifies the installation of certificates.
+
+```bash
+dnf install -y nginx
+```
+
+Since we use nginx as reverse proxy, we can make node api listen locally only:
+
+```bash
+node_listen_port=9092
+asconfigurator -x "set_server_data;listen,127.0.0.1:${node_listen_port}s"
 systemctl restart asperanoded
+```
+
+> **Note:** `s` is for HTTPS
+
+#### Aspera logs
+
+Configure logging per process for Aspera.
+This is not mandatory, but it helps.
+
+```bash
+sed -i -Ee 's/(;cron.none)(\s+\/var\/log\/messages)/\1;local2.none\2/' /etc/rsyslog.conf
+echo 'local2.* -/var/log/aspera.log' > /etc/rsyslog.d/99aspera_log.conf
+cat << EOF > /etc/logrotate.d/aspera
+/var/log/aspera.log
+{
+  rotate 5
+  weekly
+  postrotate
+    /usr/bin/killall -HUP rsyslogd
+  endscript
+}
+EOF
+for d in asperanoded asperaredisd asperacentral asperawatchd asperawatchfolderd asperarund asperahttpd http-gateway ascli async faspio-gateway;do
+  l=/var/log/${d}.log
+  echo 'if $programname == '"'$d'"' then { action(type="omfile" file="'${l}'") stop }' > /etc/rsyslog.d/00${d}_log.conf
+  sed -i -e '/aspera.log/ a '${l} /etc/logrotate.d/aspera
+done
+systemctl restart rsyslog
 ```
