@@ -62,6 +62,16 @@ variables_file=/root/aspera_vars.sh
 source $variables_file
 ```
 
+#### General system settings
+
+Install time synchroinization (chrony) and set timezone according to your preference.
+
+```bash
+dnf install -y chrony
+systemctl enable --now chronyd
+timedatectl set-timezone Europe/Paris
+```
+
 #### Install the Aspera CLI
 
 Not mandatory per se, but convenient.
@@ -107,6 +117,33 @@ This shell can be declared as legitimate shell to avoid warning messages (optina
 
 ```bash
 grep -qxF '/bin/aspshell' /etc/shells || echo '/bin/aspshell' >> /etc/shells
+```
+
+#### Aspera logs
+
+> **Note:** Optional. By default logs go to `/var/log/messages` using syslog facility `local2`. This is not mandatory, but it is convenient.
+
+Configure logging per process for Aspera.
+
+```bash
+sed -i -Ee 's/(;cron.none)(\s+\/var\/log\/messages)/\1;local2.none\2/' /etc/rsyslog.conf
+echo 'local2.* -/var/log/aspera.log' > /etc/rsyslog.d/99aspera_log.conf
+cat << EOF > /etc/logrotate.d/aspera
+/var/log/aspera.log
+{
+  rotate 5
+  weekly
+  postrotate
+    /usr/bin/killall -HUP rsyslogd
+  endscript
+}
+EOF
+for d in asperanoded asperaredisd asperacentral asperawatchd asperawatchfolderd asperarund asperahttpd http-gateway ascli async faspio-gateway;do
+  l=/var/log/${d}.log
+  echo 'if $programname == '"'$d'"' then { action(type="omfile" file="'${l}'") stop }' > /etc/rsyslog.d/00${d}_log.conf
+  sed -i -e '/aspera.log/ a '${l} /etc/logrotate.d/aspera
+done
+systemctl restart rsyslog
 ```
 
 #### Create transfer user
@@ -201,7 +238,15 @@ In order to work with Aspera on Cloud, it is required to have a public IP addres
 | TCP/443   | Node API (HTTPS) |
 
 In addition, a FQDN (DNS A Record) is also required for this address.
-If none is defined, it is possible to use a free service like freedns for that.
+If none is defined, it is possible to use a free service like [freedns](https://freedns.afraid.org/) for that.
+
+Once the DNS name is known:
+
+```bash
+echo $aspera_fqdn > /etc/hostname
+hostname $aspera_fqdn
+hostname
+```
 
 #### Certificate
 
@@ -218,9 +263,13 @@ python3 -m venv /opt/certbot/
 ln -s /opt/certbot/bin/certbot /usr/bin/certbot
 ```
 
+Generate a certificate:
+
 ```bash
 certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --standalone
 ```
+
+> **Note:** For above command to work, port TCP/443 must be reachable and FQDN reachable. Certificate and key is placed here: `/etc/letsencrypt/live/$aspera_fqdn/`
 
 #### Nginx
 
@@ -240,28 +289,41 @@ systemctl restart asperanoded
 
 > **Note:** `s` is for HTTPS
 
-#### Aspera logs
-
-Configure logging per process for Aspera.
-This is not mandatory, but it helps.
-
 ```bash
-sed -i -Ee 's/(;cron.none)(\s+\/var\/log\/messages)/\1;local2.none\2/' /etc/rsyslog.conf
-echo 'local2.* -/var/log/aspera.log' > /etc/rsyslog.d/99aspera_log.conf
-cat << EOF > /etc/logrotate.d/aspera
-/var/log/aspera.log
-{
-  rotate 5
-  weekly
-  postrotate
-    /usr/bin/killall -HUP rsyslogd
-  endscript
+cat<<EOF > /etc/nginx/conf.d/aspera.conf
+server {
+  set                        \$node_port 9092;
+  listen                     443 ssl;
+  listen                     [::]:443 ssl;
+  server_name                _;
+  root                       /usr/share/nginx/html;
+  ssl_certificate            /etc/letsencrypt/live/$aspera_fqdn/fullchain.pem;
+  ssl_certificate_key        /etc/letsencrypt/live/$aspera_fqdn/privkey.pem;
+  ssl_session_cache          builtin:1000 shared:SSL:10m;
+  ssl_protocols              TLSv1.2 TLSv1.3;
+  ssl_ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS;
+  ssl_prefer_server_ciphers  on;
+  access_log                 /var/log/nginx/global.access.log;
+  proxy_set_header           Host              \$host;
+  proxy_set_header           X-Real-IP         \$remote_addr;
+  proxy_set_header           X-Forwarded-For   \$proxy_add_x_forwarded_for;
+  proxy_set_header           X-Forwarded-Proto \$scheme;
+  proxy_set_header           Origin            https://\$http_host;
+  proxy_read_timeout         90;
+  proxy_buffering            off;
+  proxy_request_buffering    off;
+  server_tokens              off;
+  # HSTS: node API
+  location / {
+    proxy_pass               https://127.0.0.1:\$node_port;
+    access_log               /var/log/nginx/node.access.log;
+  }
 }
 EOF
-for d in asperanoded asperaredisd asperacentral asperawatchd asperawatchfolderd asperarund asperahttpd http-gateway ascli async faspio-gateway;do
-  l=/var/log/${d}.log
-  echo 'if $programname == '"'$d'"' then { action(type="omfile" file="'${l}'") stop }' > /etc/rsyslog.d/00${d}_log.conf
-  sed -i -e '/aspera.log/ a '${l} /etc/logrotate.d/aspera
-done
-systemctl restart rsyslog
+```
+
+Then enable it:
+
+```bash
+systemctl enable --now nginx
 ```
