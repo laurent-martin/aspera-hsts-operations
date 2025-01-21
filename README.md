@@ -324,6 +324,8 @@ server {
   # HSTS: node API
   location / {
     proxy_pass               https://127.0.0.1:\$node_port;
+    proxy_hide_header        Access-Control-Allow-Origin;
+    add_header               Access-Control-Allow-Origin *;
     access_log               /var/log/nginx/node.access.log;
   }
 }
