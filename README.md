@@ -26,6 +26,33 @@ In order to tether a self-managed node to Aspera on Cloud, the following are req
 
   `87650-AsperaEnterprise-unlim.eval.aspera-license`
 
+To download the RPM, one can use the following technique:
+
+- Go to <https://ibm.com/aspera>
+- Navigate to **Download and Documentation**, and then **Server**
+- Select **Download Now** for HSTS
+- That bring to [Fix Central](https://www.ibm.com/support/fixcentral/swg/selectFixes?parent=ibm%7EOther%20software&product=ibm/Other+software/IBM+Aspera+High-Speed+Transfer+Server&release=All&platform=Linux+x86_64&function=all)
+- click on the desirec HSTS version, and then make sure to select **HTTP Download**
+- then **right click** on the RPM link, and do **Copy link location**
+- This represents a temporary direct download URL
+
+Then, on Linux execute:
+
+```bash
+wget [paste the link here]
+```
+
+Alternatively, if wget is not available:
+
+```bash
+curl -o [paste only the file name of RPM] [paste the full link here]
+```
+
+For the license file, you can directly `vi` on linux, and paste inside.
+Alternatively, use `scp` to transfer those files.
+
+You will set the path to those two files in the variables in next section.
+
 ### DNS record
 
 A FQDN (DNS A Record) is required for the public address.
@@ -52,8 +79,8 @@ For convenience, let's create a shell config file `/root/aspera_vars.sh` with pa
 test $(id -u) = 0 || echo "ERROR: execute as root"
 aspera_cert_email=_your_email_here_
 aspera_fqdn=_your_server_fqdn_here_
-aspera_rpm=./ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm
-aspera_eval_lic=./87650-AsperaEnterprise-unlim.eval.aspera-license
+aspera_rpm=_path_to_hsts_rpm_
+aspera_eval_lic=_path_to_license_file_
 aspera_os_user=xfer
 aspera_home=/home/$aspera_os_user
 aspera_storage_root=$aspera_home/aoc
@@ -67,12 +94,16 @@ echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> /root/aspera_vars.sh
 
 Once created, edit the generated file `/root/aspera_vars.sh` and customize with your own values.
 
+```bash
+vi /root/aspera_vars.sh
+```
+
 Especially:
 
 - `aspera_cert_email` : place your email, this is used by Letsencrypt to notify yu when the certificate will expire.
 - `aspera_fqdn` : Place your server's DNS address. For example, I used Techzone and Freedns, and my address is: `itzvsi-f0pjbk8h.mojok.org`
-- `aspera_rpm` : path to the HSTS RPM that you downloaded.
-- `aspera_eval_lic` : Path to the Aspera HSTS license file
+- `aspera_rpm` : path to the HSTS RPM that you downloaded, e.g. `./ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm`
+- `aspera_eval_lic` : Path to the Aspera HSTS license file, e.g. `./87650-AsperaEnterprise-unlim.eval.aspera-license`
 - Other parameters should remain as is.
 
 Once modified, reload the values:
@@ -81,11 +112,7 @@ Once modified, reload the values:
 source /root/aspera_vars.sh
 ```
 
-At any time, if you open a new terminal, you can reload the configuration variables with:
-
-```bash
-source /root/aspera_vars.sh
-```
+At any time, if you open a new terminal, you can reload the configuration variables with above command.
 
 #### General system settings
 
@@ -216,7 +243,7 @@ chown -R $aspera_os_user: $aspera_home
 
 #### Define storage location root
 
-Let's define the main storage location:
+Create some main storage location, and restrict to that:
 
 ```bash
 mkdir -p $aspera_storage_root
@@ -251,7 +278,6 @@ sed -i '/^#Port 22$/a Port 33001' /etc/ssh/sshd_config
 sed -i '/^#UseDNS yes$/a UseDNS no' /etc/ssh/sshd_config
 sed -i '/^HostKey .*ecdsa_key$/s/^/#/ ' /etc/ssh/sshd_config
 sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
-update-crypto-policies --set LEGACY
 systemctl restart sshd
 ```
 
@@ -384,14 +410,6 @@ ascli config preset update node_admin --url=https://$aspera_fqdn --username=$asp
 ascli config preset set default node node_admin
 ```
 
-Configure access to AoC:
-
-(`sedemo` is the name of the AoC tenancy (organization))
-
-```bash
-ascli config wizard sedemo aoc
-```
-
 #### Create the access key
 
 ```bash
@@ -403,3 +421,12 @@ The access key credentials are saved in file: `my_ak.txt`
 #### Create the node
 
 Use the AoC web UI and select "Use my own key".
+
+Configure access to AoC:
+
+(`sedemo` is the name of the AoC tenancy (organization))
+
+```bash
+ascli config wizard sedemo aoc
+```
+
