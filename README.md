@@ -75,6 +75,12 @@ Especially:
 - `aspera_eval_lic` : Path to the Aspera HSTS license file
 - Other parameters should remain as is.
 
+Once modified, reload the values:
+
+```bash
+source /root/aspera_vars.sh
+```
+
 At any time, if you open a new terminal, you can reload the configuration variables with:
 
 ```bash
@@ -270,6 +276,7 @@ hostname
 #### Certificate
 
 A TLS certificate is required for above FQDN.
+
 If you don't have one, then it is possible to generate one with below procedure using Letsencrypt:
 
 Install `certbot`:
@@ -307,6 +314,10 @@ systemctl restart asperanoded
 
 > **Note:** `s` is for HTTPS
 
+Create a configuration file for nginx:
+
+- This one uses the Letsencrypt certificate. If you used another method, then reference the actual location of the certificte and key in parameters `ssl_certificate`
+
 ```bash
 cat<<EOF > /etc/nginx/conf.d/aspera.conf
 server {
@@ -342,7 +353,7 @@ server {
 EOF
 ```
 
-Then enable it:
+Then start and enable it permanently (on reboot):
 
 ```bash
 systemctl enable --now nginx
@@ -386,3 +397,9 @@ ascli config wizard sedemo aoc
 ```bash
 ascli node access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes | tee my_ak.txt
 ```
+
+The access key credentials are saved in file: `my_ak.txt`
+
+#### Create the node
+
+Use the AoC web UI and select "Use my own key".
