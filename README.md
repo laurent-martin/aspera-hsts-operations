@@ -1,10 +1,12 @@
-# IBM Aspera HSTS Operations
+# IBM Aspera HSTS as tethered node in AoC
 
-This document lists some common configuration on Aspera HSTS.
-
-All can be scripted, but for the sake of education, this is done step by step.
+The procedure is documented in AoC manual:
 
 <https://ibmaspera.com/help/attach_cloud_local_storage>
+
+<https://www.ibm.com/docs/en/aspera-on-cloud?topic=admin-attach-cloud-local-storage>
+
+The procedure below is similar, but uses a `nginx` reverse proxy as front end to node api.
 
 ## Configuration as tethered node in AoC
 
@@ -44,31 +46,39 @@ We assume here that a compatible Virtual Machine (or physical) is installed with
 
 #### Parameters
 
-For convenience, let's create a shell config file with parameters used:
+For convenience, let's create a shell config file `/root/aspera_vars.sh` with parameters used:
 
 ```bash
 test $(id -u) = 0 || echo "ERROR: execute as root"
-variables_file=/root/aspera_vars.sh
+aspera_cert_email=_your_email_here_
+aspera_fqdn=_your_server_fqdn_here_
 aspera_rpm=./ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm
 aspera_eval_lic=./87650-AsperaEnterprise-unlim.eval.aspera-license
 aspera_os_user=xfer
 aspera_home=/home/$aspera_os_user
 aspera_storage_root=$aspera_home/aoc
-aspera_cert_email=john@example.com
-aspera_fqdn=itzvsi-f0pjbk8h.mojok.org
 aspera_node_port=9092
 aspera_node_user=node_admin
 aspera_node_pass=$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)
-set|grep ^aspera_ > $variables_file
+set|grep ^aspera_ > /root/aspera_vars.sh
 PATH=/opt/aspera/bin:/usr/local/bin:$PATH
-echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> $variables_file
+echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> /root/aspera_vars.sh
 ```
+
+Once created, edit the generated file `/root/aspera_vars.sh` and customize with your own values.
+
+Especially:
+
+- `aspera_cert_email` : place your email, this is used by Letsencrypt to notify yu when the certificate will expire.
+- `aspera_fqdn` : Place your server's DNS address. For example, I used Techzone and Freedns, and my address is: `itzvsi-f0pjbk8h.mojok.org`
+- `aspera_rpm` : path to the HSTS RPM that you downloaded.
+- `aspera_eval_lic` : Path to the Aspera HSTS license file
+- Other parameters should remain as is.
 
 At any time, if you open a new terminal, you can reload the configuration variables with:
 
 ```bash
-variables_file=/root/aspera_vars.sh
-source $variables_file
+source /root/aspera_vars.sh
 ```
 
 #### General system settings
@@ -107,7 +117,7 @@ dnf install -y perl
 rpm -Uvh $aspera_rpm
 ```
 
-> **Note:** `perl` is still required by HSTS installer, but also later by `nginx`.
+> **Note:** `perl` is still required by HSTS installer, and also later by `nginx`.
 
 #### Install the license file
 
@@ -338,7 +348,7 @@ Then enable it:
 systemctl enable --now nginx
 ```
 
-### Declaration in AoC
+### Creation of access key and node using AoC webUI
 
 Go to Admin app, in nodes and storage.
 Add new node.
@@ -352,14 +362,27 @@ Add new node.
 - Storage: Local Storage
 - Path: `$aspera_storage_root/`
 
-Alternatively, create the access key with ascli:
+### Creation of access key and node using `ascli`
 
-First configure:
+#### Configure `ascli`
+
+Configure access to node api:
 
 ```bash
-ascli conf preset update node_admin --url=https://$aspera_fqdn --username=$aspera_node_user --password=$aspera_node_pass
+ascli config preset update node_admin --url=https://$aspera_fqdn --username=$aspera_node_user --password=$aspera_node_pass
+ascli config preset set default node node_admin
 ```
 
+Configure access to AoC:
+
+(`sedemo` is the name of the AoC tenancy (organization))
+
 ```bash
-ascli node -Pnode_admin access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes | tee my_ak.txt
+ascli config wizard sedemo aoc
+```
+
+#### Create the access key
+
+```bash
+ascli node access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes | tee my_ak.txt
 ```
