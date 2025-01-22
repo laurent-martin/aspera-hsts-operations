@@ -116,7 +116,7 @@ At any time, if you open a new terminal, you can reload the configuration variab
 
 #### General system settings
 
-Install time synchroinization (chrony) and set timezone according to your preference.
+Install time synchronization (chrony) and set timezone according to your preference.
 
 ```bash
 dnf install -y chrony
@@ -263,7 +263,7 @@ asconfigurator -x "set_server_data;files_recursive_counts_workers,3"
 
 #### Node API user
 
-Let's create a node API user and save the credentials:
+Let's create a node API user:
 
 ```bash
 /opt/aspera/bin/asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
