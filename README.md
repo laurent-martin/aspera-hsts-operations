@@ -290,6 +290,7 @@ In order to work with Aspera on Cloud, it is required to have a public IP addres
 | TCP/33001 | FASP Session (SSH) |
 | UDP/33001 | FASP Data |
 | TCP/443   | Node API (HTTPS) |
+| TCP/80    | Useful for Letsencrypt |
 
 Once the DNS name is known:
 
@@ -416,7 +417,7 @@ ascli config preset set default node node_admin
 ascli node access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes | tee my_ak.txt
 ```
 
-The access key credentials are saved in file: `my_ak.txt`
+The access key credentials are displayed and saved in file: `my_ak.txt`
 
 #### Create the node
 
@@ -429,4 +430,3 @@ Configure access to AoC:
 ```bash
 ascli config wizard sedemo aoc
 ```
-
