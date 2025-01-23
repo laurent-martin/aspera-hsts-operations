@@ -326,7 +326,7 @@ certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --
 
 #### Nginx
 
-Per se, nginx is not required, but that simplifies the installation of certificates.
+Per se, nginx is not required, but that simplifies the installation of certificates and allows using port 443 for HTTPS.
 
 ```bash
 dnf install -y nginx
@@ -343,7 +343,8 @@ systemctl restart asperanoded
 
 Create a configuration file for nginx:
 
-- This one uses the Letsencrypt certificate. If you used another method, then reference the actual location of the certificte and key in parameters `ssl_certificate`
+- This one uses the Letsencrypt certificate.
+  If you used another method, then reference the actual location of the certificte and key in parameters `ssl_certificate*`
 
 ```bash
 cat<<EOF > /etc/nginx/conf.d/aspera.conf
@@ -380,7 +381,7 @@ server {
 EOF
 ```
 
-Then start and enable it permanently (on reboot):
+Then start and enable it permanently (start on reboot):
 
 ```bash
 systemctl enable --now nginx
@@ -388,19 +389,21 @@ systemctl enable --now nginx
 
 ### Creation of access key and node using AoC webUI
 
-Go to Admin app, in nodes and storage.
-Add new node.
-`Attach my Aspera server`
+In the AoC web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
 
-- Name: anything
-- URL: value of: `https://$aspera_fqdn`
-- `Create new access key`
+- Select tab: `Attach my Aspera server`
+- **Name**: anything you like to identify this node by name
+- **URL**: value of: `https://$aspera_fqdn`
+- Leave other as default
+- Select radio button `Create a new access key`
 - Node username: `$aspera_node_user`
 - Node password: `$aspera_node_pass`
-- Storage: Local Storage
-- Path: `$aspera_storage_root/`
+- Storage: `Local Storage`
+- Path: value of `$aspera_storage_root`
 
 ### Creation of access key and node using `ascli`
+
+Here, we are going to create the access key using the CLI, which uses the node API.
 
 #### Configure `ascli`
 
@@ -421,7 +424,15 @@ The access key credentials are displayed and saved in file: `my_ak.txt`
 
 #### Create the node
 
-Use the AoC web UI and select "Use my own key".
+In the AoC web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
+
+- Select tab: `Attach my Aspera server`
+- **Name**: anything you like to identify this node by name
+- **URL**: value of: `https://$aspera_fqdn`
+- Leave other as default
+- Select radio button `Use existing`
+- Access key: value from `my_ak.txt`
+- Secret: value from `my_ak.txt`
 
 Configure access to AoC:
 
