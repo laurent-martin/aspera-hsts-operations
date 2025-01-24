@@ -202,7 +202,7 @@ systemctl restart rsyslog
 
 #### Create transfer user
 
-When used with AoC, only one transfer user is used: `xfer`.
+When used with AoC, only one transfer user is used: `xfer`, specified in `$aspera_os_user`.
 Optionally we can create a group.
 We make sure to block direct login with that user.
 Create this user:
@@ -248,8 +248,10 @@ Create some main storage location, and restrict to that:
 ```bash
 mkdir -p $aspera_storage_root
 chown $aspera_os_user: $aspera_storage_root
-asconfigurator -x "set_user_data;user_name,xfer;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
 ```
+
+> **Note:** Here we restrict to the actual storage location, but we could also define a loose restriction (no restriction), just setting to `|*`. The `|` here is simply a separator, it could be any character.
 
 #### Other configuration for AoC
 
