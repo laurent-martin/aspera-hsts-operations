@@ -10,6 +10,11 @@ The procedure below is similar, but uses a `nginx` reverse proxy as front end to
 
 ## Configuration as tethered node in AoC
 
+### Assumptions
+
+The VM where HSTS will run has a direct internet connection (no forward, not reverse proxy): it can reach internet, and can be reached from internet.
+If proxies are used/needed, then additionnal configuration can be done.
+
 ### Pre-requisites
 
 In order to tether a self-managed node to Aspera on Cloud, the following are requited:
@@ -28,21 +33,34 @@ In order to tether a self-managed node to Aspera on Cloud, the following are req
 
 To download the RPM, one can use the following technique:
 
-- Go to <https://ibm.com/aspera>
-- Navigate to **Download and Documentation**, and then **Server**
-- Select **Download Now** for HSTS
-- That bring to [Fix Central](https://www.ibm.com/support/fixcentral/swg/selectFixes?parent=ibm%7EOther%20software&product=ibm/Other+software/IBM+Aspera+High-Speed+Transfer+Server&release=All&platform=Linux+x86_64&function=all)
-- click on the desirec HSTS version, and then make sure to select **HTTP Download**
-- then **right click** on the RPM link, and do **Copy link location**
-- This represents a temporary direct download URL
+- If you are an IBMer or have access to the Aspera downloads:
 
-Then, on Linux execute:
+  - Go to <https://ibm.com/aspera>
+  - Navigate to **Download and Documentation**, and then **Server**
+  - Select **Download Now** for HSTS
+  - That bring to [Fix Central](https://www.ibm.com/support/fixcentral/swg/selectFixes?parent=ibm%7EOther%20software&product=ibm/Other+software/IBM+Aspera+High-Speed+Transfer+Server&release=All&platform=Linux+x86_64&function=all)
+  - click on the desired HSTS version, and then make sure to select **HTTP Download**
+  - then **right click** on the RPM link, and do **Copy link location**
+  - This represents a temporary direct download URL
+  - then follow the instructions below
+
+- If IBM provided with a private link to fix central:
+
+  - navigate to the prtovided private link
+  - click on the desired HSTS version, and then make sure to select **HTTP Download**
+  - then **right click** on the RPM link, and do **Copy link location**
+  - This represents a temporary direct download URL
+  - then follow the instructions below
+
+- If you were provided with the direct download link (temporary), just follow the instructions below
+
+On Linux execute:
 
 ```bash
 wget [paste the link here]
 ```
 
-Alternatively, if wget is not available:
+Alternatively, if `wget` is not available, `curl` is always present:
 
 ```bash
 curl -o [paste only the file name of RPM] [paste the full link here]
@@ -59,6 +77,8 @@ A FQDN (DNS A Record) is required for the public address.
 
 If none is defined, it is possible to use a free service like [freedns](https://freedns.afraid.org/) for that.
 
+Use a domain that has lower number of users, so that you are not restricted if you'll generate the letsencrypt cert.
+
 ### Installation and configuration of tethered node
 
 We assume here that a compatible Virtual Machine (or physical) is installed with a RHEL-compatible Linux distribution: RHEL, Rocky Linux, Alma Linux, etc...
@@ -73,7 +93,7 @@ We assume here that a compatible Virtual Machine (or physical) is installed with
 
 #### Parameters
 
-For convenience, let's create a shell config file `/root/aspera_vars.sh` with parameters used:
+For convenience, let's create a shell config file `./aspera_vars.sh` with parameters used (assuming to be `root` in `/root`):
 
 ```bash
 test $(id -u) = 0 || echo "ERROR: execute as root"
@@ -87,15 +107,14 @@ aspera_storage_root=$aspera_home/aoc
 aspera_node_port=9092
 aspera_node_user=node_admin
 aspera_node_pass=$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)
-set|grep ^aspera_ > /root/aspera_vars.sh
-PATH=/opt/aspera/bin:/usr/local/bin:$PATH
-echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> /root/aspera_vars.sh
+set|grep ^aspera_ > ./aspera_vars.sh
+echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> ./aspera_vars.sh
 ```
 
-Once created, edit the generated file `/root/aspera_vars.sh` and customize with your own values.
+Once created, edit the generated file `./aspera_vars.sh` and customize with your own values.
 
 ```bash
-vi /root/aspera_vars.sh
+vi ./aspera_vars.sh
 ```
 
 Especially:
@@ -109,7 +128,7 @@ Especially:
 Once modified, reload the values:
 
 ```bash
-source /root/aspera_vars.sh
+source ./aspera_vars.sh
 ```
 
 At any time, if you open a new terminal, you can reload the configuration variables with above command.
@@ -150,12 +169,12 @@ dnf install -y perl
 rpm -Uvh $aspera_rpm
 ```
 
-> **Note:** `perl` is still required by HSTS installer, and also later by `nginx`.
+> **Note:** `perl` is still required by the HSTS installer and also later by `nginx`.
 
 #### Install the license file
 
 It goes to `/opt/aspera/etc/aspera-license`.
-This file must be world-readable, or at least readable by `asperadaemons` and transfer users.
+This file must be world-readable, or at least readable by `asperadaemons` and transfer users (`xfer`).
 
 ```bash
 cp $aspera_eval_lic /opt/aspera/etc/aspera-license
@@ -175,7 +194,7 @@ grep -qxF '/bin/aspshell' /etc/shells || echo '/bin/aspshell' >> /etc/shells
 
 #### Aspera logs
 
-> **Note:** Optional. By default logs go to `/var/log/messages` using syslog facility `local2`. This is not mandatory, but it is convenient.
+> **Note:** Optional but it is convenient. By default logs go to `/var/log/messages` using syslog facility `local2`.
 
 Configure logging per process for Aspera.
 
@@ -202,7 +221,7 @@ systemctl restart rsyslog
 
 #### Create transfer user
 
-When used with AoC, only one transfer user is used: `xfer`, specified in `$aspera_os_user`.
+When used with AoC, only one transfer user is used: `xfer`, specified by `$aspera_os_user`.
 Optionally we can create a group.
 We make sure to block direct login with that user.
 Create this user:
