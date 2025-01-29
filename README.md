@@ -143,6 +143,15 @@ systemctl enable --now chronyd
 timedatectl set-timezone Europe/Paris
 ```
 
+#### Define storage location root
+
+Let's create some main storage location that will be used by Aspera:
+
+```bash
+mkdir -p $aspera_storage_root
+chown $aspera_os_user: $aspera_storage_root
+```
+
 #### Install the Aspera CLI
 
 Not mandatory per se, but convenient.
@@ -260,18 +269,6 @@ chmod -R go-rwx $aspera_home/.ssh
 chown -R $aspera_os_user: $aspera_home
 ```
 
-#### Define storage location root
-
-Create some main storage location, and restrict to that:
-
-```bash
-mkdir -p $aspera_storage_root
-chown $aspera_os_user: $aspera_storage_root
-asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
-```
-
-> **Note:** Here we restrict to the actual storage location, but we could also define a loose restriction (no restriction), just setting to `|*`. The `|` here is simply a separator, it could be any character.
-
 #### Other configuration for AoC
 
 Aspera on Cloud requires activity logging:
@@ -284,11 +281,50 @@ asconfigurator -x "set_server_data;files_recursive_counts_workers,3"
 
 #### Node API user
 
-Let's create a node API user:
+In order to access the API of HSTS, so we can create an access key, we have to provision an API user:
 
 ```bash
 /opt/aspera/bin/asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
 ```
+
+Access keys created with this API user will enable transfers that will be running on the host under user `$aspera_os_user`.
+
+In order to be able to create access keys, we have to remove any docroot and define storage restrictions, to which access key creation will be limited to, for the transfer user.
+The simplest is to define a loose restriction:
+
+```bash
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
+```
+
+At this point, you can skip to the next section, or continue to read for more details.
+
+The transfer user is associated to a **list** of **restrictions**.
+Also, the `docroot` shall not be defined.
+A **restriction** is a [**glob**](https://en.wikipedia.org/wiki/Glob_(programming)) (i.e. pattern, not a regex).
+It contains fixed characters and can use wildcards `*` and `?` (`\` to protect).
+The syntax of declaration of that list in `asconfigurator` is: `[character][item1][character][item2]...`.
+The leading character can be anything, and is used as separator later. Typically, `|` is used.
+
+If we want to restrict creation of access keys to only folders under the selected storage location: `$aspera_storage_root`, then one can do:
+
+```bash
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
+```
+
+Internally, in HSTS, storage locations are stored as a URI.
+I.e. `[scheme]://[storage server+credential]/[path]?[parameters]`.
+For local storage, `[scheme]` is `file`, and the absolute path starts with `/`.
+For example, for a local storage `/data`, the URL would be `file:////data`.
+
+At the time of creation of access key, the access key storage root URI will be validated against the list of restriction globs.
+If the restriction list is only `file:////data` (no glob), then only that precise path will be allowed.
+Else, in order to allow any path under two locations: `/data/mnt1` and also S3 storage `s3://mys3/bucket`, the restriction list would be `file:////data/mnt1/*` and `s3://mys3/bucket/*`, and command would be:
+
+```bash
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:////data/mnt1/*|s3://mys3/bucket/*"
+```
+
+It is important to note that the restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
 
 #### SSH confguration
 
@@ -420,7 +456,10 @@ In the AoC web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Cr
 - Node username: `$aspera_node_user`
 - Node password: `$aspera_node_pass`
 - Storage: `Local Storage`
-- Path: value of `$aspera_storage_root`
+- Path: `$aspera_storage_root`
+
+> **Note:** The Path used for access key creation must pass glob validation with the restriction list created earlier.
+> If the glob was ending with a `*`, then the Path can be any folder below the folder prefix.
 
 ### Creation of access key and node using `ascli`
 
