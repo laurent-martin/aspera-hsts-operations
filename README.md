@@ -296,13 +296,30 @@ The simplest is to define a loose restriction:
 asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
 ```
 
-At this point, you can skip to the next section, or continue to read for more details.
+#### Transfer user file restrictions
 
-The transfer user is associated to a **list** of **restrictions**.
+> **Note:** This section is informational, you can skip to the next section if you are not interrested by details.
+
+The transfer user is associated to a **list** of **file restrictions**.
 Also, the `docroot` shall not be defined.
 A **restriction** is a [**glob**](https://en.wikipedia.org/wiki/Glob_(programming)) (i.e. pattern, not a regex).
-It contains fixed characters and can use wildcards `*` and `?` (`\` to protect).
-The syntax of declaration of that list in `asconfigurator` is: `[character][item1][character][item2]...`.
+
+Aspera glob syntax is as follows:
+
+- `?` match any single character
+- `*` match any number of any character
+- `\` escapes the next character (to protect evaluation of one of the special characters: `?*\`)
+- any other character is compared as-is
+
+> **Note:** In fact, Aspera glob match bytes (8-bit) and does not consider any multi-byte encoding (such as UTF8).
+
+For example, for a restriction: `file:////data/*` and the following paths:
+
+- `file:////data/` yes
+- `file:////mnt/` no
+- `file:////data/folder` yes
+
+The syntax of declaration of that **list** in `asconfigurator` is: `[character][item1][character][item2]...`.
 The leading character can be anything, and is used as separator later. Typically, `|` is used.
 
 If we want to restrict creation of access keys to only folders under the selected storage location: `$aspera_storage_root`, then one can do:
@@ -324,7 +341,7 @@ Else, in order to allow any path under two locations: `/data/mnt1` and also S3 s
 asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:////data/mnt1/*|s3://mys3/bucket/*"
 ```
 
-It is important to note that the restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
+> **Note:** the restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
 
 #### SSH confguration
 
