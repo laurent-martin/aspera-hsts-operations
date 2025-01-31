@@ -481,7 +481,7 @@ Check with:
 curl https://$aspera_fqdn/info -u $aspera_node_user:$aspera_node_pass
 ```
 
-Check that the follwing values are set:
+Check that the following values are set:
 
 ```json
 "transfer_user" : "xfer",
