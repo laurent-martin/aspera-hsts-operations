@@ -471,6 +471,23 @@ Then start and enable it permanently (start on reboot):
 systemctl enable --now nginx
 ```
 
+### Verification
+
+At this point, nginx shall be proxying requests to the node api, and an API user and transfer user shall be configured.
+
+Check with:
+
+```bash
+curl https://$aspera_fqdn/info -u $aspera_node_user:$aspera_node_pass
+```
+
+Check that the follwing value are set:
+
+```json
+"transfer_user" : "xfer",
+"docroot" : "",
+```
+
 ### Creation of access key and node using AoC webUI
 
 In the AoC web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
