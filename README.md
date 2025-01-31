@@ -473,7 +473,7 @@ systemctl enable --now nginx
 
 ### Verification
 
-At this point, nginx shall be proxying requests to the node api, and an API user and transfer user shall be configured.
+At this point, nginx shall be proxying requests to the node api and an API user and transfer user shall be configured.
 
 Check with:
 
@@ -481,7 +481,7 @@ Check with:
 curl https://$aspera_fqdn/info -u $aspera_node_user:$aspera_node_pass
 ```
 
-Check that the follwing value are set:
+Check that the follwing values are set:
 
 ```json
 "transfer_user" : "xfer",
