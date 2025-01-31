@@ -296,9 +296,19 @@ The simplest is to define a loose restriction:
 asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
 ```
 
+When parameters for `asperanoded` (node api server) are modified, one shall restart the daemon to reload the configuration:
+
+```bash
+systemctl restart asperanoded
+```
+
+> **Note:** Similar effect can be achieved with `asnodeadmin --reload`. In case of installation, one can just restart the daemon for config reload.
+
 #### Transfer user file restrictions
 
 > **Note:** This section is informational, you can skip to the next section if you are not interrested by details.
+
+Skip to next section, if unsure.
 
 The transfer user is associated to a **list** of **file restrictions**.
 Also, the `docroot` shall not be defined.
@@ -413,7 +423,7 @@ asconfigurator -x "set_server_data;listen,127.0.0.1:${aspera_node_port}s"
 systemctl restart asperanoded
 ```
 
-> **Note:** `s` is for HTTPS
+> **Note:** `s` is for HTTPS. Restart is required to change listening address.
 
 Create a configuration file for nginx:
 
