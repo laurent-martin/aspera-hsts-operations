@@ -143,15 +143,6 @@ systemctl enable --now chronyd
 timedatectl set-timezone Europe/Paris
 ```
 
-#### Define storage location root
-
-Let's create some main storage location that will be used by Aspera:
-
-```bash
-mkdir -p $aspera_storage_root
-chown $aspera_os_user: $aspera_storage_root
-```
-
 #### Install the Aspera CLI
 
 Not mandatory per se, but convenient.
@@ -231,7 +222,7 @@ systemctl restart rsyslog
 #### Create transfer user
 
 When used with AoC, only one transfer user is used: `xfer`, specified by `$aspera_os_user`.
-Optionally we can create a group.
+Optionally we can create a group `asperausers` in case we need to manage multiple transfer users.
 We make sure to block direct login with that user.
 Create this user:
 
@@ -240,6 +231,15 @@ groupadd asperausers
 useradd --create-home --no-user-group --gid asperausers --shell /bin/aspshell $aspera_os_user
 passwd --lock $aspera_os_user
 chage --mindays 0 --maxdays 99999 --inactive -1 --expiredate -1 $aspera_os_user
+```
+
+#### Define storage location root
+
+Let's create some main storage location that will be used by Aspera and make it accessible by the transfer user:
+
+```bash
+mkdir -p $aspera_storage_root
+chown $aspera_os_user: $aspera_storage_root
 ```
 
 #### Configure token encryption key
