@@ -153,7 +153,7 @@ This can alternatively be installed on the laptop instead. <https://github.com/I
 dnf module -y reset ruby
 dnf module -y enable ruby:3.3
 dnf install -y ruby-devel
-gem install aspera-cli
+gem install aspera-cli -v 4.20.0
 ```
 
 Check availability with:
