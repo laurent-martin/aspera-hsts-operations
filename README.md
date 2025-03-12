@@ -143,6 +143,20 @@ systemctl enable --now chronyd
 timedatectl set-timezone Europe/Paris
 ```
 
+Make sure that SELinux is disabled:
+
+```console
+$ sestatus|grep mode:
+Current mode:                   permissive
+```
+
+If mode is `enforcing`:
+
+```bash
+setenforce Permissive
+sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
+```
+
 #### Install the Aspera CLI
 
 Not mandatory per se, but convenient.
