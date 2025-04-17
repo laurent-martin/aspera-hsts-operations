@@ -2,18 +2,19 @@
 
 The procedure is documented in the **Aspera on Cloud** manual:
 
-<https://ibmaspera.com/help/attach_cloud_local_storage>
+<https://ibmaspera.com/help/0_tethered_map>
 
-<https://www.ibm.com/docs/en/aspera-on-cloud?topic=admin-attach-cloud-local-storage>
+<https://www.ibm.com/docs/en/aspera-on-cloud?topic=node-tether-your-aspera-transfer-server-aspera-cloud>
 
-The procedure below is similar, but uses a `nginx` reverse proxy as front end to node api.
+The procedure below is similar.
+Instead of a metered transfer server license, we assume here is the use of a perpetual or evaluation license.
 
 ## Configuration as tethered node in AoC
 
 ### Assumptions
 
 The VM where HSTS will run has a direct internet connection (no forward, not reverse proxy): it can reach internet, and can be reached from internet.
-If proxies are used/needed, then additionnal configuration can be done.
+If proxies are used/needed, then additional configuration can be done.
 
 ### Pre-requisites
 
@@ -21,8 +22,8 @@ In order to tether a self-managed node to **Aspera on Cloud**, the following are
 
 - A self-managed system with admin access, typically a Linux Virtual Machine
 - A public IP address where this machine is reachable on a minimum of 2 TCP ports and 1 UDP port
-- A DNS A record (FQDN) for that IP address (or use freedns, see below)
-- A TLS certificate for that FQDN (or use letsencypt see below: requires port TCP/443)
+- A DNS A record (FQDN) for that IP address (or use FreeDNS, see below)
+- A TLS certificate for that FQDN (or use `letsencypt` see below: requires port TCP/443)
 - The installation package for HSTS: for example:
 
   `ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm`
@@ -40,15 +41,15 @@ To download the RPM, one can use the following technique:
   - Select **Download Now** for HSTS
   - That bring to [Fix Central](https://www.ibm.com/support/fixcentral/swg/selectFixes?parent=ibm%7EOther%20software&product=ibm/Other+software/IBM+Aspera+High-Speed+Transfer+Server&release=All&platform=Linux+x86_64&function=all)
   - click on the desired HSTS version, and then make sure to select **HTTP Download**
-  - then **right click** on the RPM link, and do **Copy link location**
+  - then **right-click** on the RPM link, and do **Copy link location**
   - This represents a temporary direct download URL
   - then follow the instructions below
 
 - If IBM provided with a private link to fix central:
 
-  - navigate to the prtovided private link
+  - navigate to the provided private link
   - click on the desired HSTS version, and then make sure to select **HTTP Download**
-  - then **right click** on the RPM link, and do **Copy link location**
+  - then **right-click** on the RPM link, and do **Copy link location**
   - This represents a temporary direct download URL
   - then follow the instructions below
 
@@ -66,7 +67,7 @@ Alternatively, if `wget` is not available, `curl` is always present:
 curl -o [paste only the file name of RPM] [paste the full link here]
 ```
 
-For the license file, you can directly `vi` on linux, and paste inside.
+For the license file, you can directly `vi` on Linux, and paste inside.
 Alternatively, use `scp` to transfer those files.
 
 You will set the path to those two files in the variables in next section.
@@ -75,9 +76,9 @@ You will set the path to those two files in the variables in next section.
 
 A FQDN (DNS A Record) is required for the public address.
 
-If none is defined, it is possible to use a free service like [freedns](https://freedns.afraid.org/) for that.
+If none is defined, it is possible to use a free service like [FreeDNS](https://freedns.afraid.org/) for that.
 
-Use a domain that has lower number of users, so that you are not restricted if you'll generate the letsencrypt cert.
+Use a domain that has lower number of users, so that you are not restricted if you'll generate the `letsencrypt` cert.
 
 ### Installation and configuration of tethered node
 
@@ -88,7 +89,7 @@ We assume here that a compatible Virtual Machine (or physical) is installed with
 >
 > **Note:** We need to generate some secrets of given length.
 > Several tools can be used for random.
-> For example we will use `tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40` to generate a 40 character random string.
+> For example, we will use `tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40` to generate a 40 character random string.
 > We could also use `openssl rand -base64 40|head -c 40` for the same.
 
 #### Parameters
@@ -119,8 +120,8 @@ vi ./aspera_vars.sh
 
 Especially:
 
-- `aspera_cert_email` : place your email, this is used by Letsencrypt to notify yu when the certificate will expire.
-- `aspera_fqdn` : Place your server's DNS address. For example, I used Techzone and Freedns, and my address is: `itzvsi-f0pjbk8h.mojok.org`
+- `aspera_cert_email` : place your email, this is used by `letsencrypt` to notify you when the certificate will expire.
+- `aspera_fqdn` : Place your server's DNS address. For example, I used IBM Techzone and FreeDNS, and my address is: `itzvsi-f0pjbk8h.mojok.org`
 - `aspera_rpm` : path to the HSTS RPM that you downloaded, e.g. `./ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm`
 - `aspera_eval_lic` : Path to the Aspera HSTS license file, e.g. `./87650-AsperaEnterprise-unlim.eval.aspera-license`
 - Other parameters should remain as is.
@@ -135,7 +136,7 @@ At any time, if you open a new terminal, you can reload the configuration variab
 
 #### General system settings
 
-Install time synchronization (chrony) and set timezone according to your preference.
+Install time synchronization (`chrony`) and set timezone according to your preference.
 
 ```bash
 dnf install -y chrony
@@ -143,7 +144,7 @@ systemctl enable --now chronyd
 timedatectl set-timezone Europe/Paris
 ```
 
-Make sure that SELinux is disabled:
+Make sure that SELinux is disabled: execute:
 
 ```bash
 sestatus | grep mode:
@@ -158,12 +159,19 @@ Current mode:                   permissive
 
 If mode is `enforcing`:
 
+- Changes the current operation mode, execute:
+
 ```bash
 setenforce Permissive
+```
+
+- Change the mode at system startup, execute:
+
+```bash
 sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
 ```
 
-> **Note:** The first command changes the operation mode instantly, and the second one changes the mode on system startup. One can check again with `sestatus`
+> **Note:** One can check again with `sestatus`
 
 #### Install the Aspera CLI
 
@@ -208,7 +216,7 @@ chmod a+r /opt/aspera/etc/aspera-license
 > **Note:** Optional, but removes some warnings.
 
 As Aspera uses SSH by default, a protection is provided with a secure shell: `aspshell`.
-This shell can be declared as legitimate shell to avoid warning messages (optinal):
+This shell can be declared as legitimate shell to avoid warning messages (optional):
 
 ```bash
 grep -qxF '/bin/aspshell' /etc/shells || (echo '/bin/aspshell' >> /etc/shells)
@@ -216,7 +224,7 @@ grep -qxF '/bin/aspshell' /etc/shells || (echo '/bin/aspshell' >> /etc/shells)
 
 #### Aspera logs
 
-> **Note:** Optional but it is convenient. By default logs go to `/var/log/messages` using syslog facility `local2`.
+> **Note:** Optional but it is convenient. By default, logs go to `/var/log/messages` using syslog facility `local2`.
 
 Configure logging per process for Aspera.
 
@@ -296,9 +304,8 @@ chown -R $aspera_os_user: $aspera_home
 **Aspera on Cloud** requires activity logging:
 
 ```bash
-asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,true;activity_file_event_logging,true;activity_bandwidth_logging,true'
-asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true'
-asconfigurator -x "set_server_data;files_recursive_counts_workers,5"
+asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,true;activity_file_event_logging,true;activity_bandwidth_logging,true;files_recursive_counts_workers,5'
+asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true;partial_file_suffix,.inprogress'
 ```
 
 #### Node API user
@@ -311,14 +318,14 @@ In order to access the API of HSTS, so we can create an access key, we have to p
 
 Access keys created with this API user will enable transfers that will be running on the host under user `$aspera_os_user`.
 
-In order to be able to create access keys, we have to remove any docroot and define storage restrictions, to which access key creation will be limited to, for the transfer user.
+In order to be able to create access keys, we have to remove any **docroot** and define storage restrictions, to which access key creation will be limited to, for the transfer user.
 The simplest is to define a loose restriction:
 
 ```bash
 asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
 ```
 
-When parameters for `asperanoded` (node api server) are modified, one shall restart the daemon to reload the configuration:
+When parameters for `asperanoded` (Node API server) are modified, one shall restart the daemon to reload the configuration:
 
 ```bash
 systemctl restart asperanoded
@@ -328,7 +335,7 @@ systemctl restart asperanoded
 
 #### Transfer user file restrictions
 
-> **Note:** This section is informational, you can skip to the next section if you are not interrested by details.
+> **Note:** This section is informational, you can skip to the next section if you are not interested in details.
 
 Skip to next section, if unsure.
 
@@ -343,7 +350,7 @@ Aspera glob syntax is as follows:
 - `\` escapes the next character (to protect evaluation of one of the special characters: `?*\`)
 - any other character is compared as-is
 
-> **Note:** In fact, Aspera glob match bytes (8-bit) and does not consider any multi-byte encoding (such as UTF8).
+> **Note:** In fact, Aspera glob match bytes (8-bit) and does not consider any multibyte encoding (such as UTF8).
 
 For example, for a restriction: `file:////data/*` and the following paths:
 
@@ -375,7 +382,7 @@ asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file
 
 > **Note:** the restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
 
-#### SSH confguration
+#### SSH configuration
 
 Let's configure SSH to also listen on port 33001:
 
@@ -396,7 +403,7 @@ In order to work with **Aspera on Cloud**, it is required to have a public IP ad
 | TCP/33001 | FASP Session (SSH) |
 | UDP/33001 | FASP Data |
 | TCP/443   | Node API (HTTPS) |
-| TCP/80    | Useful for Letsencrypt |
+| TCP/80    | Useful for `letsencrypt` |
 
 Once the DNS name is known:
 
@@ -410,7 +417,7 @@ hostname
 
 A TLS certificate is required for above FQDN.
 
-If you don't have one, then it is possible to generate one with below procedure using Letsencrypt:
+If you don't have one, then it is possible to generate one with below procedure using `letsencrypt`:
 
 Install `certbot`:
 
@@ -438,7 +445,7 @@ Per se, nginx is not required, but that simplifies the installation of certifica
 dnf install -y nginx
 ```
 
-Since we use nginx as reverse proxy, we can make node api listen locally only:
+Since we use nginx as reverse proxy, we can make Node API listen locally only:
 
 ```bash
 asconfigurator -x "set_server_data;listen,127.0.0.1:${aspera_node_port}s"
@@ -449,8 +456,8 @@ systemctl restart asperanoded
 
 Create a configuration file for nginx:
 
-- This one uses the Letsencrypt certificate.
-  If you used another method, then reference the actual location of the certificte and key in parameters `ssl_certificate*`
+- This one uses the `letsencrypt` certificate.
+  If you used another method, then reference the actual location of the certificate and key in parameters `ssl_certificate*`
 
 ```bash
 cat<<EOF > /etc/nginx/conf.d/aspera.conf
@@ -495,9 +502,9 @@ systemctl enable --now nginx
 
 ### Verification
 
-> **Note:** Ideally, below command shall be executed from outside the on-prem environment. The goal being to verify that **Aspera on Cloud** services can correctly access the on-prem server and that the certificate is well recognized from internet.
+> **Note:** Ideally, below command shall be executed from outside the on-premise environment. The goal being to verify that **Aspera on Cloud** services can correctly access the on-premise server and that the certificate is well recognized from internet.
 
-At this point, nginx shall be proxying requests to the node api and an API user and transfer user shall be configured.
+At this point, nginx shall be forward requests to the Node API and an API user and transfer user shall be configured.
 
 Check with:
 
@@ -512,7 +519,7 @@ Check that the following values are set like this:
 "docroot" : "",
 ```
 
-### Creation of access key and node using AoC webUI
+### Creation of access key and node using AoC web UI
 
 In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
 
@@ -535,7 +542,7 @@ Here, we are going to create the access key using the CLI, which uses the node A
 
 #### Configure `ascli`
 
-Configure access to node api:
+Configure access to Node API:
 
 ```bash
 ascli config preset update node_admin --url=https://$aspera_fqdn --username=$aspera_node_user --password=$aspera_node_pass
@@ -565,23 +572,21 @@ In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and sto
 ## Accessing AoC using command line
 
 Configure access to **Aspera on Cloud**: `myorg` is the name of the AoC tenancy (organization).
-One can also place the url of the org: `https://myorg.ibmaspera.com`
+One can also place the URL of the org: `https://myorg.ibmaspera.com`
 
 ```bash
-ascli config wizard myorg aoc
+ascli config wizard [myorg] aoc
 ```
 
 Then follow the Wizard.
 
-## Configure AEJD
+## Configure Aspera Event Journal Daemon (AEJD)
 
-**Work in progress**
+### Special case: HSTE
 
-<%=cmd%> aoc admin client create @json:'{"data":{"name":"laurentnode","client_subject_scopes":["alee","aejd"],"client_subject_enabled":true}}' --fields=token --format=csv
+If the transfer server is an **HSTS**, skip this step.
 
-* Special case= HSTE
-
-If the node is an Aspera Endpoint, create this file: `/opt/aspera/etc/systemd/asperaejd.service` with this content:
+If the node is an **Aspera Endpoint**, then create this file: `/opt/aspera/etc/systemd/asperaejd.service` with this content:
 
 ```ini
 [Unit]
@@ -602,8 +607,43 @@ Restart=always
 RestartSec=10s
 ```
 
-Then activate as root:
+Then activate AEJD as root:
 
 ```bash
 /opt/aspera/etc/setup/setup-systemd.sh enable
 ```
+
+### Create a node registration token
+
+This token can be used a single time.
+It can be created using the AoC web UI, or using `ascli` (requires to have configured access to AoC through `ascli`, see previous steps):
+
+```bash
+ascli aoc admin client_registration_token create @json:'{"data":{"name":"laurentnode","client_subject_scopes":["aejd"],"client_subject_enabled":true}}' --fields=token --show-secrets=yes
+```
+
+Take a note of the token, as its value cannot be retrieved later.
+This value will be used only once.
+
+### Configure to use AEJ
+
+As root, or prefixing with: `sudo /opt/aspera/bin/`
+
+```bash
+asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,127.0.0.1"
+```
+
+Use the token from previous step in: `[reg_token_value]`
+
+```bash
+asp-cloud-config tether --aoc-registration-token [reg_token_value] --aoc-url https://api.ibmaspera.com
+```
+
+```bash
+systemctl restart asperaejd
+systemctl restart asperanoded
+```
+
+## TODO
+
+Regular backup of Redis database. (see HSTS and AoC manual)
