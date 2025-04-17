@@ -634,7 +634,7 @@ This value will be used only once.
 
 ### Configure to use AEJ
 
-As root, or prefixing with: `sudo /opt/aspera/bin/`
+Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`)
 
 ```bash
 asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,127.0.0.1"
