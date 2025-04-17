@@ -1,6 +1,6 @@
 # IBM Aspera HSTS as tethered node in AoC
 
-The procedure is documented in AoC manual:
+The procedure is documented in the **Aspera on Cloud** manual:
 
 <https://ibmaspera.com/help/attach_cloud_local_storage>
 
@@ -17,7 +17,7 @@ If proxies are used/needed, then additionnal configuration can be done.
 
 ### Pre-requisites
 
-In order to tether a self-managed node to Aspera on Cloud, the following are requited:
+In order to tether a self-managed node to **Aspera on Cloud**, the following are requited:
 
 - A self-managed system with admin access, typically a Linux Virtual Machine
 - A public IP address where this machine is reachable on a minimum of 2 TCP ports and 1 UDP port
@@ -145,8 +145,14 @@ timedatectl set-timezone Europe/Paris
 
 Make sure that SELinux is disabled:
 
+```bash
+sestatus | grep mode:
+```
+
+Example of output:
+
 ```console
-$ sestatus|grep mode:
+$ sestatus | grep mode:
 Current mode:                   permissive
 ```
 
@@ -157,11 +163,13 @@ setenforce Permissive
 sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
 ```
 
+> **Note:** The first command changes the operation mode instantly, and the second one changes the mode on system startup. One can check again with `sestatus`
+
 #### Install the Aspera CLI
 
-Not mandatory per se, but convenient.
+> **Note:** Installation of the Aspera CLI is not mandatory but simply convenient. It can be installed locally, or on a remote system (Windows, macOS, ...)
 
-This can alternatively be installed on the laptop instead. <https://github.com/IBM/aspera-cli>
+User Manual: <https://github.com/IBM/aspera-cli>
 
 ```bash
 dnf module -y reset ruby
@@ -170,7 +178,7 @@ dnf install -y ruby-devel
 gem install aspera-cli -v 4.20.0
 ```
 
-Check availability with:
+Check installation with:
 
 ```bash
 ascli -v
@@ -203,7 +211,7 @@ As Aspera uses SSH by default, a protection is provided with a secure shell: `as
 This shell can be declared as legitimate shell to avoid warning messages (optinal):
 
 ```bash
-grep -qxF '/bin/aspshell' /etc/shells || echo '/bin/aspshell' >> /etc/shells
+grep -qxF '/bin/aspshell' /etc/shells || (echo '/bin/aspshell' >> /etc/shells)
 ```
 
 #### Aspera logs
@@ -235,9 +243,9 @@ systemctl restart rsyslog
 
 #### Create transfer user
 
-When used with AoC, only one transfer user is used: `xfer`, specified by `$aspera_os_user`.
+When used with **Aspera on Cloud**, all transfers are executed under a single technical user (transfer user): `xfer`, specified by `$aspera_os_user`.
 Optionally we can create a group `asperausers` in case we need to manage multiple transfer users.
-We make sure to block direct login with that user.
+We make sure to block password-based login with that user and ensure it never expires.
 Create this user:
 
 ```bash
@@ -265,7 +273,7 @@ asconfigurator -x 'set_node_data;token_dynamic_key,false'
 asconfigurator -x "set_node_data;token_encryption_key,$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)"
 ```
 
-If you prefer to use dynamic keys (**skip** this part if you like KISS):
+If you prefer to use dynamic keys (**skip** this part if you like simplicity):
 
 ```bash
 asconfigurator -x 'set_node_data;token_dynamic_key,true'
@@ -285,12 +293,12 @@ chown -R $aspera_os_user: $aspera_home
 
 #### Other configuration for AoC
 
-Aspera on Cloud requires activity logging:
+**Aspera on Cloud** requires activity logging:
 
 ```bash
 asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,true;activity_file_event_logging,true;activity_bandwidth_logging,true'
 asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true'
-asconfigurator -x "set_server_data;files_recursive_counts_workers,3"
+asconfigurator -x "set_server_data;files_recursive_counts_workers,5"
 ```
 
 #### Node API user
@@ -381,7 +389,7 @@ systemctl restart sshd
 
 #### Public IP and DNS
 
-In order to work with Aspera on Cloud, it is required to have a public IP address on which the following ports are open:
+In order to work with **Aspera on Cloud**, it is required to have a public IP address on which the following ports are open:
 
 | Port | Usage |
 |------|-------|
@@ -487,6 +495,8 @@ systemctl enable --now nginx
 
 ### Verification
 
+> **Note:** Ideally, below command shall be executed from outside the on-prem environment. The goal being to verify that **Aspera on Cloud** services can correctly access the on-prem server and that the certificate is well recognized from internet.
+
 At this point, nginx shall be proxying requests to the node api and an API user and transfer user shall be configured.
 
 Check with:
@@ -504,7 +514,7 @@ Check that the following values are set like this:
 
 ### Creation of access key and node using AoC webUI
 
-In the AoC web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
+In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
 
 - Select tab: `Attach my Aspera server`
 - **Name**: anything you like to identify this node by name
@@ -542,7 +552,7 @@ The access key credentials are displayed and saved in file: `my_ak.txt`
 
 #### Create the node
 
-In the AoC web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
+In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
 
 - Select tab: `Attach my Aspera server`
 - **Name**: anything you like to identify this node by name
@@ -552,10 +562,48 @@ In the AoC web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Cr
 - Access key: value from `my_ak.txt`
 - Secret: value from `my_ak.txt`
 
-Configure access to AoC:
+## Accessing AoC using command line
 
-(`sedemo` is the name of the AoC tenancy (organization))
+Configure access to **Aspera on Cloud**: `myorg` is the name of the AoC tenancy (organization).
+One can also place the url of the org: `https://myorg.ibmaspera.com`
 
 ```bash
-ascli config wizard sedemo aoc
+ascli config wizard myorg aoc
+```
+
+Then follow the Wizard.
+
+## Configure AEJD
+
+**Work in progress**
+
+<%=cmd%> aoc admin client create @json:'{"data":{"name":"laurentnode","client_subject_scopes":["alee","aejd"],"client_subject_enabled":true}}' --fields=token --format=csv
+
+* Special case= HSTE
+
+If the node is an Aspera Endpoint, create this file: `/opt/aspera/etc/systemd/asperaejd.service` with this content:
+
+```ini
+[Unit]
+Description=IBM Aspera Event Journal Daemon
+ConditionPathExists=/opt/aspera/sbin/aejd
+StartLimitInterval=0
+
+[Service]
+User=asperadaemon
+Group=aspadmins
+Type=simple
+PIDFile=/opt/aspera/var/run/aspera/aejd.pid
+ExecStart=/opt/aspera/sbin/aejd
+ExecReload=/bin/kill -s HUP $MAINPID
+TimeoutStopSec=20
+KillMode=process
+Restart=always
+RestartSec=10s
+```
+
+Then activate as root:
+
+```bash
+/opt/aspera/etc/setup/setup-systemd.sh enable
 ```
