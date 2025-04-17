@@ -619,10 +619,17 @@ This token can be used a single time.
 It can be created using the AoC web UI, or using `ascli` (requires to have configured access to AoC through `ascli`, see previous steps):
 
 ```bash
-ascli aoc admin client_registration_token create @json:'{"data":{"name":"laurentnode","client_subject_scopes":["aejd"],"client_subject_enabled":true}}' --fields=token --show-secrets=yes
+registration_token=$(ascli aoc admin client_registration_token create @json:'{"data":{"name":"laurentnode","client_subject_scopes":["aejd"],"client_subject_enabled":true}}' --fields=token --show-secrets=yes)
 ```
 
-Take a note of the token, as its value cannot be retrieved later.
+This command saves the generated token in shell variable: `$registration_token`
+
+To display the value:
+
+```bash
+echo $registration_token
+```
+
 This value will be used only once.
 
 ### Configure to use AEJ
@@ -633,11 +640,13 @@ As root, or prefixing with: `sudo /opt/aspera/bin/`
 asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,127.0.0.1"
 ```
 
-Use the token from previous step in: `[reg_token_value]`
+Use the token from previous step in: `registration_token` variable:
 
 ```bash
-asp-cloud-config tether --aoc-registration-token [reg_token_value] --aoc-url https://api.ibmaspera.com
+asp-cloud-config tether --aoc-registration-token $registration_token --aoc-url https://api.ibmaspera.com
 ```
+
+Restart the services to take in account:
 
 ```bash
 systemctl restart asperaejd
