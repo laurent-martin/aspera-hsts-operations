@@ -39,26 +39,29 @@ To download the RPM, one can use the following technique:
   - Go to <https://ibm.com/aspera>
   - Navigate to **Download and Documentation**, and then **Server**
   - Select **Download Now** for HSTS
-  - That bring to [Fix Central](https://www.ibm.com/support/fixcentral/swg/selectFixes?parent=ibm%7EOther%20software&product=ibm/Other+software/IBM+Aspera+High-Speed+Transfer+Server&release=All&platform=Linux+x86_64&function=all)
-  - click on the desired HSTS version, and then make sure to select **HTTP Download**
-  - then **right-click** on the RPM link, and do **Copy link location**
-  - This represents a temporary direct download URL
-  - then follow the instructions below
+
+    That bring to [Fix Central](https://www.ibm.com/support/fixcentral/swg/selectFixes?parent=ibm%7EOther%20software&product=ibm/Other+software/IBM+Aspera+High-Speed+Transfer+Server&release=All&platform=Linux+x86_64&function=all)
+  - Click on the desired HSTS or HSTE version, and then make sure to select **HTTP Download**
+  - Then **right-click** on the RPM link, and do **Copy link location**
+
+    This represents a temporary direct download URL
+  - Then follow the instructions below
 
 - If IBM provided with a private link to fix central:
 
-  - navigate to the provided private link
-  - click on the desired HSTS version, and then make sure to select **HTTP Download**
-  - then **right-click** on the RPM link, and do **Copy link location**
-  - This represents a temporary direct download URL
-  - then follow the instructions below
+  - Navigate to the provided private link
+  - Click on the desired HSTS version, and then make sure to select **HTTP Download**
+  - Then **right-click** on the RPM link, and do **Copy link location**
+  
+    This represents a temporary direct download URL
+  - Then follow the instructions below
 
 - If you were provided with the direct download link (temporary), just follow the instructions below
 
 On Linux execute:
 
 ```bash
-wget [paste the link here]
+wget [URL link from previous step here]
 ```
 
 Alternatively, if `wget` is not available, `curl` is always present:
@@ -571,7 +574,7 @@ In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and sto
 
 ## Accessing AoC using command line
 
-Configure access to **Aspera on Cloud**: `myorg` is the name of the AoC tenancy (organization).
+Configure access to **Aspera on Cloud**: `myorg` is the name of the AoC tenancy (organization), i.e. the first part of the address of the URL.
 One can also place the URL of the org: `https://myorg.ibmaspera.com`
 
 ```bash
@@ -580,7 +583,14 @@ ascli config wizard [myorg] aoc
 
 Then follow the Wizard.
 
+> **Note:** When using the CLI, a user will be authenticated using a private key.
+> AoC supports a single public key per user.
+> If the user uses the CLI from multiple systems, then the same private key shall be used on those systems (for example on the Aspera Transfer Server, and on a laptop).
+
 ## Configure Aspera Event Journal Daemon (AEJD)
+
+The Aspera Event Journal Daemon is responsible to report events from the Aspera Transfer Server, back to the Aspera on Cloud API.
+It reports file events (transfers, etc...).
 
 ### Special case: HSTE
 
@@ -607,22 +617,29 @@ Restart=always
 RestartSec=10s
 ```
 
-Then activate AEJD as root:
+Then activate **AEJD**. Execute as root:
 
 ```bash
 /opt/aspera/etc/setup/setup-systemd.sh enable
 ```
 
+The AEJ Daemon shall now be known.
+Its status can be shown with:
+
+```bash
+systemctl status asperaejd
+```
+
 ### Create a node registration token
 
 This token can be used a single time.
-It can be created using the AoC web UI, or using `ascli` (requires to have configured access to AoC through `ascli`, see previous steps):
+It can be created using the AoC web UI, or using `ascli` (requires to have configured access to AoC through `ascli`, see previous section):
+
+This command saves the generated token in shell variable: `$registration_token`
 
 ```bash
 registration_token=$(ascli aoc admin client_registration_token create @json:'{"data":{"name":"laurentnode","client_subject_scopes":["aejd"],"client_subject_enabled":true}}' --fields=token --show-secrets=yes)
 ```
-
-This command saves the generated token in shell variable: `$registration_token`
 
 To display the value:
 
@@ -632,12 +649,12 @@ echo $registration_token
 
 This value will be used only once.
 
-### Configure to use AEJ
+### Activate the AEJ Daemon
 
 Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`)
 
 ```bash
-asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,127.0.0.1"
+asconfigurator -x 'set_server_data;aej_logging,true;aej_port,28000;aej_host,127.0.0.1'
 ```
 
 Use the token from previous step in: `registration_token` variable:
@@ -646,13 +663,29 @@ Use the token from previous step in: `registration_token` variable:
 asp-cloud-config tether --aoc-registration-token $registration_token --aoc-url https://api.ibmaspera.com
 ```
 
-Restart the services to take in account:
+Restart Aspera services:
 
 ```bash
 systemctl restart asperaejd
 systemctl restart asperanoded
 ```
 
-## TODO
+## Transfer server backup
 
-Regular backup of Redis database. (see HSTS and AoC manual)
+Some configuration of the Transfer server can be re-created easily, such as node AI user, static configuration (`aspera.conf`) or even access keys.
+But some other state information cannot be re-created, as it is the result of file transfers.
+Such information include file identifiers and permissions.
+Those are stored in a local database.
+So it is important to proceed to a regular backup of this information.
+
+In case of disaster, the Aspera transfer Server node shall be rebuilt.
+This includes:
+
+- installation and configuration of Operating system
+- installation and configuration of Aspera Software
+- installation and configuration of other Software (nginx)
+- restoration of state backup
+
+An easy way to prevent disaster, in the case of use of Virtual Machines, is to perform a snapshot of the storage.
+
+The installation and configuration of software can even be automated using tools such as Redhat Ansible and IBM Hashicorp Terraform.
