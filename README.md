@@ -329,6 +329,15 @@ asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,
 asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true;partial_file_suffix,.inprogress'
 ```
 
+By default, the HSTS uses caching for folder contents.
+To deactivate folder content caching, execute (Optional):
+
+```bash
+asconfigurator -x 'set_server_data;files_cache_ttl,0'
+```
+
+Folder caching is useful when reading folder content is slow, due to slow storage or large number of files in folders.
+
 #### Node API user
 
 In order to access the API of HSTS, so we can create an access key, we have to provision an API user:
