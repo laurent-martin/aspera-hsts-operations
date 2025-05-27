@@ -157,6 +157,12 @@ If you like, you may set the `PATH` in your shell profile as above.
 
 #### General system settings
 
+Check that the system has date synchronization:
+
+```bash
+timedatectl
+```
+
 Install time synchronization (`chrony`) and set timezone according to your preference.
 
 ```bash
@@ -682,19 +688,24 @@ This value will be used only once.
 
 ### Activate the AEJ Daemon
 
-Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`)
+Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`):
+
+This command activate reporting of events from Node Daemon to the AEJ Daemon, once Node Daemon is restarted.
 
 ```bash
 asconfigurator -x 'set_server_data;aej_logging,true;aej_port,28000;aej_host,127.0.0.1'
 ```
 
-Use the token from previous step in: `registration_token` variable:
+Use the token from previous step in: `registration_token` variable.
+This command creates the configuration file: `/opt/aspera/etc/aejd.conf` after calling back AoC API to register the node.
 
 ```bash
-asp-cloud-config tether --aoc-registration-token $registration_token --aoc-url https://api.ibmaspera.com
+/opt/aspera/bin/asp-cloud-config tether --aoc-registration-token $registration_token --aoc-url https://api.ibmaspera.com
 ```
 
-Restart Aspera services:
+> **Note:** As of 4.x HSTS, the command `asp-cloud-config` has a defect where the config file `aejd.conf` is created in `$PWD/../etc` instead of `/opt/aspera/etc` if the command is executed without a full path. So either move to `/opt/aspera/bin/` before executing, or use the full path to the command like proposed here.
+
+Restart Aspera services in that order to apply the configuration:
 
 ```bash
 systemctl restart asperaejd
@@ -768,7 +779,7 @@ Alternatively:
 echo "127.0.0.1 $aspera_fqdn" >> /etc/hosts
 ```
 
-Check with (or with ping):
+Check with (or with `ping`):
 
 ```bash
 getent hosts $aspera_fqdn
@@ -833,7 +844,7 @@ Check with:
 curl -i $aspera_node_url/ping
 ```
 
-```console
+```yaml
 HTTP/1.1 200 OK
 Server: nginx
 Date: Mon, 05 May 2025 14:11:27 GMT
