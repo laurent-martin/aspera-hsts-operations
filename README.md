@@ -361,6 +361,12 @@ The simplest is to define a loose restriction:
 asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
 ```
 
+Use of token is mandatory, so we need to enable it for the transfer user:
+
+```bash
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;authorization_transfer_in_value,token;authorization_transfer_out_value,token"
+```
+
 When parameters for `asperanoded` (Node API server) are modified, one shall restart the daemon to reload the configuration:
 
 ```bash
@@ -717,6 +723,7 @@ systemctl restart asperanoded
 ### Transfer server backup
 
 Some configuration of the Transfer server can be re-created easily, such as node AI user, static configuration (`aspera.conf`) or even access keys.
+
 But some other state information cannot be re-created, as it is the result of file transfers.
 Such information include file identifiers and permissions.
 Those are stored in a local database.
@@ -733,6 +740,23 @@ This includes:
 An easy way to prevent disaster, in the case of use of Virtual Machines, is to perform a snapshot of the storage.
 
 The installation and configuration of software can even be automated using tools such as Red Hat Ansible and IBM HashiCorp Terraform.
+
+#### System files
+
+Any customization to the OS must be restored, such as the ones listed in this document.
+
+#### HSTS config files
+
+The following files shall be backed up:
+
+- `/opt/aspera/etc/aspera.conf`
+- `/opt/aspera/etc/aspera-license`
+- `/opt/aspera/etc/conf.d/node_id.conf`
+- `/opt/aspera/etc/conf.d/cluster_id.conf`
+
+#### HSTS Redis DB
+
+Refer to the [HSTS documentation](https://www.ibm.com/docs/en/ahts) for details on backup and restore of the HSTS Redis database.
 
 ### Changing FQDN and certificate
 
