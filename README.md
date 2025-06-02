@@ -122,10 +122,10 @@ For convenience, let's create a shell config file `./aspera_vars.sh` with parame
 
 ```bash
 test $(id -u) = 0 || echo "ERROR: execute as root"
-aspera_cert_email=_your_email_here_
-aspera_fqdn=_your_server_fqdn_here_
 aspera_rpm=_path_to_hsts_rpm_
 aspera_eval_lic=_path_to_license_file_
+aspera_cert_email=_your_email_here_
+aspera_fqdn=_your_server_fqdn_here_
 aspera_os_user=xfer
 aspera_home=/home/$aspera_os_user
 aspera_storage_root=$aspera_home/aoc
@@ -163,7 +163,7 @@ Check that the system has date synchronization:
 timedatectl
 ```
 
-Install time synchronization (`chrony`) and set timezone according to your preference.
+If not, then install time synchronization (`chrony`) and set timezone according to your preference.
 
 ```bash
 dnf install -y chrony
@@ -177,10 +177,7 @@ Make sure that SELinux is disabled: execute:
 sestatus | grep mode:
 ```
 
-Example of output:
-
 ```console
-$ sestatus | grep mode:
 Current mode:                   permissive
 ```
 
@@ -222,8 +219,7 @@ ascli -v
 #### Install the HSTS software
 
 ```bash
-dnf install -y perl
-rpm -Uvh $aspera_rpm
+dnf install $aspera_rpm
 ```
 
 > **Note:** `perl` is still required by the HSTS installer and also later by **NGINX**.
@@ -382,7 +378,7 @@ systemctl restart asperanoded
 Skip to next section, if unsure.
 
 The transfer user is associated to a **list** of **file restrictions**.
-Also, the `docroot` shall not be defined.
+Also, the `docroot` shall not be defined for that transfer user.
 A **restriction** is a [**glob**](https://en.wikipedia.org/wiki/Glob_(programming)) (i.e. pattern, not a regex).
 
 Aspera glob syntax is as follows:
@@ -392,16 +388,19 @@ Aspera glob syntax is as follows:
 - `\` escapes the next character (to protect evaluation of one of the special characters: `?*\`)
 - any other character is compared as-is
 
-> **Note:** In fact, Aspera glob match bytes (8-bit) and does not consider any multibyte encoding (such as UTF8).
+> **Note:** Aspera glob match bytes (8-bit) and does not consider any multibyte encoding (such as UTF8). UTF8 match should work.
 
-For example, for a restriction: `file:////data/*` and the following paths:
+For example, for a restriction: `file:////data/*` :
 
-- `file:////data/` yes
-- `file:////mnt/` no
-- `file:////data/folder` yes
+| Path  | Match? |
+|-------|--------|
+| `file:////data/`       | yes |
+| `file:////mnt/`        | no  |
+| `file:////data/folder` | yes |
 
 The syntax of declaration of that **list** in `asconfigurator` is: `[character][item1][character][item2]...`.
-The leading character can be anything, and is used as separator later. Typically, `|` is used.
+The leading character can be anything, and is used as separator later.
+Typically, `|` is used.
 
 If we want to restrict creation of access keys to only folders under the selected storage location: `$aspera_storage_root`, then one can do:
 
@@ -415,6 +414,8 @@ For local storage, `[scheme]` is `file`, and the absolute path starts with `/`.
 For example, for a local storage `/data`, the URL would be `file:////data`.
 
 At the time of creation of access key, the access key storage root URI will be validated against the list of restriction globs.
+Note that an access key is created with a storage location specified as JSON, not URI.
+Aspera internally converts the storage location to a URI, and then checks that the URI matches one of the globs in the restriction list.
 If the restriction list is only `file:////data` (no glob), then only that precise path will be allowed.
 Else, in order to allow any path under two locations: `/data/mnt1` and also S3 storage `s3://mys3/bucket`, the restriction list would be `file:////data/mnt1/*` and `s3://mys3/bucket/*`, and command would be:
 
@@ -422,11 +423,11 @@ Else, in order to allow any path under two locations: `/data/mnt1` and also S3 s
 asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:////data/mnt1/*|s3://mys3/bucket/*"
 ```
 
-> **Note:** the restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
+> **Note:** The restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
 
 #### SSH configuration
 
-Let's configure SSH to also listen on port 33001:
+Let's configure SSH to also listen on port 33001 only:
 
 ```bash
 sed -i '/^#Port 22$/a Port 33001' /etc/ssh/sshd_config
@@ -435,6 +436,8 @@ sed -i '/^HostKey .*ecdsa_key$/s/^/#/ ' /etc/ssh/sshd_config
 sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
 systemctl restart sshd
 ```
+
+> **Note:** to keep both 33001 and 22, uncomment the line: `#Port 22`
 
 #### Public IP and DNS
 
@@ -555,7 +558,7 @@ At this point, **NGINX** shall be forward requests to the Node API and an API us
 Check with:
 
 ```bash
-curl https://$aspera_fqdn/info -u $aspera_node_user:$aspera_node_pass
+curl $aspera_node_url/info -u $aspera_node_user:$aspera_node_pass
 ```
 
 Check that the following values are set like this:
@@ -756,7 +759,7 @@ The following files shall be backed up:
 
 #### HSTS Redis DB
 
-Refer to the [HSTS documentation](https://www.ibm.com/docs/en/ahts) for details on backup and restore of the HSTS Redis database.
+Refer to the [HSTS documentation](https://www.ibm.com/docs/en/ahts) for details on backup and restore of the HSTS Redis database, section: `Backing up and restoring a node database`.
 
 ### Changing FQDN and certificate
 
@@ -764,7 +767,7 @@ If the hostname (FQDN) of the HSTS needs to be modified, the associated certific
 
 Prerequisites:
 
-- Get a certificate for that FQDN
+- Get a certificate for that new FQDN
 - Register this FQDN in DNS (A or AAAA record)
 - For convenience, edit the file `aspera_vars.sh` and update the value for `aspera_fqdn`.
 
