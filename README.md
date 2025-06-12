@@ -229,7 +229,7 @@ ascli -v
 #### Install the HSTS software
 
 ```bash
-dnf install $aspera_rpm
+dnf install -y $aspera_rpm
 ```
 
 > **Note:** `perl` is still required by the HSTS installer and also later by **NGINX**.
@@ -731,9 +731,13 @@ This command creates the configuration file: `/opt/aspera/etc/aejd.conf` after c
 
 ```bash
 /opt/aspera/bin/asp-cloud-config tether --aoc-registration-token $registration_token --aoc-url https://api.ibmaspera.com
+chmod 600 /opt/aspera/etc/aejd.json
+chown asperadaemon: /opt/aspera/etc/aejd.json
 ```
 
-> **Note:** As of 4.x HSTS, the command `asp-cloud-config` has a defect where the config file `aejd.conf` is created in `$PWD/../etc` instead of `/opt/aspera/etc` if the command is executed without a full path. So either move to `/opt/aspera/bin/` before executing, or use the full path to the command like proposed here.
+> **Note:** As of 4.4.5 HSTS, the command `asp-cloud-config` has a defect where the config file `aejd.conf` is created in `$PWD/../etc` instead of `/opt/aspera/etc` if the command is executed without a full path.
+So either move to `/opt/aspera/bin/` before executing, or use the full path to the command like proposed here.
+Also, the resulting file `aejd.json` shall be readable by user `asperadaemon`.
 
 Restart Aspera services in that order to apply the configuration:
 
