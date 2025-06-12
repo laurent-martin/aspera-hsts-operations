@@ -11,15 +11,19 @@ The procedure below is similar.
 Instead of a metered transfer server license, we use here a license file.
 This is adapted for evaluations or to use a perpetual license.
 
-## Configuration as tethered node in AoC
+This procedure is especially adapted to set up a self-managed **Aspera High-Speed Transfer Server** (HSTS) as a tethered node to **Aspera on Cloud** (AoC) for a Proof of Concept (PoC) or evaluation.
+
+## Installation and Configuration
 
 ### Assumptions
 
-The VM where HSTS will run has a direct internet connection (no forward, not reverse proxy): it can reach internet, and can be reached from internet.
-If NAT is used for the Node API, then we assume here that the same port is used for external and internal, else both ports shall be listened by **NGINX**.
+The VM where HSTS will run has a direct internet connection (no forward, no reverse proxy): it can reach internet, and can be reached from internet.
+If NAT is used for the Node API, then we assume here that the same port is used for external and internal, else both ports shall be listened by **NGINX** so that both external and internal users can reach it.
 If proxies are used/needed, then additional configuration can be done.
 
-> **Note:** It is also possible to use HTTPS instead of SSH for the TCP connection for transfers. In that case, a single HTTPS port may be shared between node and transfer. That requires additional configuration in **NGINX**.
+> **Note:** It is also possible to use HTTPS instead of SSH for the TCP connection for transfers.
+In that case, a single HTTPS port may be shared between node and transfer.
+That requires additional configuration in **NGINX**.
 
 ### Pre-requisites
 
@@ -29,15 +33,17 @@ In order to tether a self-managed node to **Aspera on Cloud**, the following are
 - A public IP address where this machine is reachable on a minimum of 2 TCP ports (for Node and SSH) and 1 UDP port
 - A DNS A record (FQDN) for that IP address (or use FreeDNS, see below)
 - A TLS certificate for that FQDN (or use `letsencypt` see below: requires port TCP/443 or TCP/80)
+- A license file provided by IBM. For example, an evaluation license file:
+
+  `87650-AsperaEnterprise-unlim.eval.aspera-license`
+
 - The installation package for HSTS: for example:
 
   `ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm`
 
-- A license file. For example, an evaluation license file:
+### Download the HSTS RPM
 
-  `87650-AsperaEnterprise-unlim.eval.aspera-license`
-
-To download the RPM, one can use the following technique:
+To download the RPM, one can use the following methods:
 
 - If you are an IBMer or have access to the Aspera downloads:
 
@@ -82,25 +88,27 @@ You will set the path to those two files in the variables in next section.
 
 ### DNS record
 
-A FQDN (DNS A Record) is required for the public address.
+A FQDN (DNS A Record) is required for the public address of the HSTS.
 
-If none is defined, it is possible to use a free service like [FreeDNS](https://freedns.afraid.org/) for that.
+If none is defined, it is possible to use a free service like [FreeDNS](https://freedns.afraid.org/) for that (PoC).
 
-Use a domain that has lower number of users, so that you are not restricted if you'll generate the `letsencrypt` cert.
+Use a domain that has lower number of users, so that you are not restricted when you'll generate the `letsencrypt` cert.
 
 ### Installation and configuration of tethered node
 
-We assume here that a compatible Virtual Machine (or physical) is installed with a RHEL-compatible Linux distribution: RHEL, Rocky Linux, Alma Linux, etc...
+We assume here that a compatible Virtual (or physical) Machine is installed with a RHEL-compatible Linux distribution: RHEL, Rocky Linux, Alma Linux, etc...
 
 > **Note:** The following commands are executed as `root` inside `root`'s home (`/root`).
 > To impersonate root, execute: `sudo -i`
 >
-> **Note:** We need to generate some secrets of given length.
+> **Note:** We need to generate some secrets of a minimum given length.
 > Several tools can be used for random.
 > For example, we will use `tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40` to generate a 40 character random string.
 > We could also use `openssl rand -base64 40|head -c 40` for the same.
 
 #### Parameters
+
+Next sections will use some parameters that you will need to define.
 
 | Parameter                | Description |
 |--------------------------|-------------|
@@ -118,7 +126,8 @@ We assume here that a compatible Virtual Machine (or physical) is installed with
 | `aspera_node_ext_port`   | The external port on which the Node API will be reachable. Typically, `443`. |
 | `aspera_node_url`        | The URL where Node API is accessible. |
 
-For convenience, let's create a shell config file `./aspera_vars.sh` with parameters used (assuming to be `root` in `/root`):
+For convenience, let's create a shell config file `./aspera_vars.sh` with parameters used (assuming to be `root` in `/root`).
+Execute the following commands in a terminal:
 
 ```bash
 test $(id -u) = 0 || echo "ERROR: execute as root"
@@ -163,7 +172,7 @@ Check that the system has date synchronization:
 timedatectl
 ```
 
-If not, then install time synchronization (`chrony`) and set timezone according to your preference.
+If not, then install time synchronization (e.g. `chrony`) and set timezone according to your preference.
 
 ```bash
 dnf install -y chrony
@@ -199,7 +208,8 @@ sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
 
 #### Install the Aspera CLI
 
-> **Note:** Installation of the Aspera CLI is not mandatory but simply convenient. It can be installed locally, or on a remote system (Windows, macOS, ...)
+> **Note:** Installation of the Aspera CLI is not mandatory but simply convenient.
+It can be installed locally, or on a remote system (Windows, macOS, ...)
 
 User Manual: <https://github.com/IBM/aspera-cli>
 
@@ -236,7 +246,7 @@ chmod a+r /opt/aspera/etc/aspera-license
 
 #### Declare the Aspera shell
 
-> **Note:** Optional, but removes some warnings.
+> **Note:** Optional, good practice, removes some warnings.
 
 As Aspera uses SSH by default, a protection is provided with a secure shell: `aspshell`.
 This shell can be declared as legitimate shell to avoid warning messages (optional):
@@ -247,7 +257,9 @@ grep -qxF '/bin/aspshell' /etc/shells || (echo '/bin/aspshell' >> /etc/shells)
 
 #### Aspera logs
 
-> **Note:** Optional but it is convenient. By default, logs go to `/var/log/messages` using syslog facility `local2`.
+> **Note:** Optional but it is convenient.
+Aspera logs use syslog and facility `local2`.
+By default, logs go to `/var/log/messages` with rsyslog.
 
 Configure logging per process for Aspera.
 
@@ -309,7 +321,7 @@ If you prefer to use dynamic keys (**skip** this part if you like simplicity):
 ```bash
 asconfigurator -x 'set_node_data;token_dynamic_key,true'
 asconfigurator -x 'set_node_data;token_encryption_key,AS_NULL'
-tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40|askmscli -rs redis-primary-key
+tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40|askmscli --rotate --set-secret-by-category=redis-primary-key
 askmscli --init-keystore --user=$aspera_os_user
 ```
 
@@ -484,20 +496,28 @@ certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --
 
 #### Nginx
 
-Per se, **NGINX** is not required, but that simplifies the installation of certificates, allows using port 443 for HTTPS and adds a security layer.
+Per se, **NGINX** is not required, but it has several advantages:
 
-```bash
-dnf install -y nginx
-```
+- allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port 443
+- simplifies the installation of certificates
+- adds a security layer with a well-known reverse proxy
+- allows to use a single port for both Node API and transfers (WSS, if configured)
 
-Since we use **NGINX** as reverse proxy, we can make Node API listen locally only:
+Since we will use **NGINX** as reverse proxy, we can make Node API listen locally only:
 
 ```bash
 asconfigurator -x "set_server_data;listen,127.0.0.1:${aspera_node_local_port}s"
 systemctl restart asperanoded
 ```
 
-> **Note:** `s` is for HTTPS. Restart is required to change listening address.
+> **Note:** `s` is for HTTPS.
+Restart is required to change listening address.
+
+Install **NGINX**:
+
+```bash
+dnf install -y nginx
+```
 
 Create a configuration file for **NGINX**:
 
@@ -551,14 +571,15 @@ systemctl enable --now nginx
 
 ### Verification
 
-> **Note:** Ideally, below command shall be executed from outside the on-premise environment. The goal being to verify that **Aspera on Cloud** services can correctly access the on-premise server and that the certificate is well recognized from internet.
+> **Note:** Ideally, below command shall be executed from outside the on-premise environment.
+The goal being to verify that **Aspera on Cloud** services can correctly access the on-premise server and that the certificate is well recognized from internet.
 
 At this point, **NGINX** shall be forward requests to the Node API and an API user and transfer user shall be configured.
 
 Check with:
 
 ```bash
-curl $aspera_node_url/info -u $aspera_node_user:$aspera_node_pass
+curl -u $aspera_node_user:$aspera_node_pass $aspera_node_url/info
 ```
 
 Check that the following values are set like this:
