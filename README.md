@@ -11,25 +11,25 @@ The procedure below is similar.
 Instead of a metered transfer server license, we use here a license file.
 This is adapted for evaluations or to use a perpetual license.
 
-This procedure is especially adapted to set up a self-managed **Aspera High-Speed Transfer Server** (HSTS) as a tethered node to **Aspera on Cloud** (AoC) for a Proof of Concept (PoC) or evaluation.
+This procedure is especially adapted to set up a self-managed **Aspera High-Speed Transfer Server** (HSTS) or **Aspera High-Speed Transfer Endpoint** (HSTE) as a tethered node to **Aspera on Cloud** (AoC) for a Proof of Concept (PoC) or evaluation.
 
 ## Installation and Configuration
 
 ### Assumptions
 
 The VM where HSTS will run has a direct internet connection (no forward, no reverse proxy): it can reach internet, and can be reached from internet.
-If NAT is used for the Node API, then we assume here that the same port is used for external and internal, else both ports shall be listened by **NGINX** so that both external and internal users can reach it.
-If proxies are used/needed, then additional configuration can be done.
+If NAT is used for the Node API, then we assume here that the same port is used for external and internal, else both ports shall be listened by **Nginx** so that both external and internal users can reach it.
+If proxies are used/needed, then additional configuration can be done, not covered here.
 
 > **Note:** It is also possible to use HTTPS instead of SSH for the TCP connection for transfers.
 In that case, a single HTTPS port may be shared between node and transfer.
-That requires additional configuration in **NGINX**.
+That requires additional configuration in **Nginx**.
 
 ### Pre-requisites
 
 In order to tether a self-managed node to **Aspera on Cloud**, the following are requited:
 
-- A self-managed system with `root` access, typically a Linux Virtual Machine.
+- A self-managed system with admin (`root`) access, typically a Linux Virtual Machine.
 - A public IP address where this machine is reachable on a minimum of 2 TCP ports (for Node and SSH) and 1 UDP port
 - A DNS A record (FQDN) for that IP address (or use FreeDNS, see below)
 - A TLS certificate for that FQDN (or use `letsencypt` see below: requires port TCP/443 or TCP/80)
@@ -43,7 +43,7 @@ In order to tether a self-managed node to **Aspera on Cloud**, the following are
 
 ### Download the HSTS RPM
 
-To download the RPM, one can use the following methods:
+To download the RPM for HSTS (or HSTE), one can use the following methods:
 
 - If you are an IBMer or have access to the Aspera downloads:
 
@@ -124,7 +124,7 @@ Next sections will use some parameters that you will need to define.
 | `aspera_node_user`       | The main administrative API user who will create access keys. |
 | `aspera_node_pass`       | Password for the latter. |
 | `aspera_node_ext_port`   | The external port on which the Node API will be reachable. Typically, `443`. |
-| `aspera_node_url`        | The URL where Node API is accessible. |
+| `aspera_node_ext_url`        | The URL where Node API is accessible. |
 
 For convenience, let's create a shell config file `./aspera_vars.sh` with parameters used (assuming to be `root` in `/root`).
 Execute the following commands in a terminal:
@@ -138,12 +138,14 @@ aspera_fqdn=_your_server_fqdn_here_
 aspera_os_user=xfer
 aspera_home=/home/$aspera_os_user
 aspera_storage_root=$aspera_home/aoc
-aspera_node_local_port=9092
-aspera_node_local_secu=s
 aspera_node_user=node_admin
 aspera_node_pass=$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)
+aspera_node_local_addr=127.0.0.1
+aspera_node_local_port=9092
+aspera_node_local_secu=s
+aspera_node_local_url=http$aspera_node_local_secu://$aspera_node_local_addr:$aspera_node_local_port
 aspera_node_ext_port=443
-aspera_node_url=https://$aspera_fqdn:$aspera_node_ext_port
+aspera_node_ext_url=https://$aspera_fqdn:$aspera_node_ext_port
 set|grep ^aspera_ > ./aspera_vars.sh
 echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> ./aspera_vars.sh
 ```
@@ -232,7 +234,7 @@ ascli -v
 dnf install -y $aspera_rpm
 ```
 
-> **Note:** `perl` is still required by the HSTS installer and also later by **NGINX**.
+> **Note:** `perl` is still required by the HSTS installer and also later by **Nginx**.
 
 #### Install the license file
 
@@ -496,30 +498,30 @@ certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --
 
 #### Nginx
 
-Per se, **NGINX** is not required, but it has several advantages:
+Technically, **Nginx** is not required, but it is recommended when the Node API fronts Internet and it has several advantages. It :
 
-- allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port 443
-- simplifies the installation of certificates
-- adds a security layer with a well-known reverse proxy
-- allows to use a single port for both Node API and transfers (WSS, if configured)
+- allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port `443`,
+- simplifies the installation of certificates,
+- adds a security layer with a well-known reverse proxy,
+- allows to use a single port for both Node API and transfers (WSS, if configured) and other services.
 
-Since we will use **NGINX** as reverse proxy, we can make Node API listen locally only:
+Since we will use **Nginx** as reverse proxy, we can make Node API listen locally only:
 
 ```bash
-asconfigurator -x "set_server_data;listen,127.0.0.1:${aspera_node_local_port}s"
+asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_node_local_port$aspera_node_local_secu"
 systemctl restart asperanoded
 ```
 
 > **Note:** `s` is for HTTPS.
 Restart is required to change listening address.
 
-Install **NGINX**:
+Install **Nginx**:
 
 ```bash
 dnf install -y nginx
 ```
 
-Create a configuration file for **NGINX**:
+Create a configuration file for **Nginx**:
 
 - This one uses the `letsencrypt` certificate.
   If you used another method, then reference the actual location of the certificate and key in parameters `ssl_certificate*`
@@ -529,7 +531,6 @@ cert_chain_file=/etc/letsencrypt/live/$aspera_fqdn/fullchain.pem
 cert_key_file=/etc/letsencrypt/live/$aspera_fqdn/privkey.pem
 cat<<EOF > /etc/nginx/conf.d/aspera.conf
 server {
-  set                        \$node_port $aspera_node_local_port;
   listen                     $aspera_node_ext_port ssl;
   listen                     [::]:$aspera_node_ext_port ssl;
   server_name                _;
@@ -545,14 +546,13 @@ server {
   proxy_set_header           X-Real-IP         \$remote_addr;
   proxy_set_header           X-Forwarded-For   \$proxy_add_x_forwarded_for;
   proxy_set_header           X-Forwarded-Proto \$scheme;
-  proxy_set_header           Origin            https://\$http_host;
   proxy_read_timeout         90;
   proxy_buffering            off;
   proxy_request_buffering    off;
   server_tokens              off;
   # HSTS: node API
   location / {
-    proxy_pass               https://127.0.0.1:\$node_port;
+    proxy_pass               $aspera_node_local_url;
     proxy_hide_header        Access-Control-Allow-Origin;
     add_header               Access-Control-Allow-Origin *;
     access_log               /var/log/nginx/node.access.log;
@@ -574,12 +574,12 @@ systemctl enable --now nginx
 > **Note:** Ideally, below command shall be executed from outside the on-premise environment.
 The goal being to verify that **Aspera on Cloud** services can correctly access the on-premise server and that the certificate is well recognized from internet.
 
-At this point, **NGINX** shall be forward requests to the Node API and an API user and transfer user shall be configured.
+At this point, **Nginx** shall be forward requests to the Node API and an API user and transfer user shall be configured.
 
 Check with:
 
 ```bash
-curl -u $aspera_node_user:$aspera_node_pass $aspera_node_url/info
+curl -u $aspera_node_user:$aspera_node_pass $aspera_node_ext_url/info
 ```
 
 Check that the following values are set like this:
@@ -595,7 +595,7 @@ In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and sto
 
 - Select tab: `Attach my Aspera server`
 - **Name**: anything you like to identify this node by name
-- **URL**: value of: `https://$aspera_fqdn`
+- **URL**: value of: `$aspera_node_ext_url`
 - Leave other as default
 - Select radio button `Create a new access key`
 - Node username: `$aspera_node_user`
@@ -615,7 +615,7 @@ Here, we are going to create the access key using the CLI, which uses the node A
 Configure access to Node API:
 
 ```bash
-ascli config preset update node_admin --url=https://$aspera_fqdn --username=$aspera_node_user --password=$aspera_node_pass
+ascli config preset update node_admin --url=$aspera_node_ext_url --username=$aspera_node_user --password=$aspera_node_pass
 ascli config preset set default node node_admin
 ```
 
@@ -633,7 +633,7 @@ In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and sto
 
 - Select tab: `Attach my Aspera server`
 - **Name**: anything you like to identify this node by name
-- **URL**: value of: `https://$aspera_fqdn`
+- **URL**: value of: `$aspera_node_ext_url`
 - Leave other as default
 - Select radio button `Use existing`
 - Access key: value from `my_ak.txt`
@@ -723,7 +723,7 @@ Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`):
 This command activate reporting of events from Node Daemon to the AEJ Daemon, once Node Daemon is restarted.
 
 ```bash
-asconfigurator -x 'set_server_data;aej_logging,true;aej_port,28000;aej_host,127.0.0.1'
+asconfigurator -x 'set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_local_addr'
 ```
 
 Use the token from previous step in: `registration_token` variable.
@@ -762,7 +762,7 @@ This includes:
 
 - installation and configuration of Operating system
 - installation and configuration of Aspera Software
-- installation and configuration of other Software (**NGINX**)
+- installation and configuration of other Software (**Nginx**)
 - restoration of state backup
 
 An easy way to prevent disaster, in the case of use of Virtual Machines, is to perform a snapshot of the storage.
@@ -845,7 +845,7 @@ getent hosts $aspera_fqdn
 
 #### Storing the certificate and private key
 
-The certificate chain and its key should be stored in a location accessible by **NGINX**.
+The certificate chain and its key should be stored in a location accessible by **Nginx**.
 It can be anywhere, including a standard location:
 
 ```bash
@@ -861,7 +861,7 @@ Let's store certificate files in standard locations:
 - `/etc/pki/tls/certs/newhost.example.com.fullchain.pem`
 - `/etc/pki/tls/private/newhost.example.com.key.pem`
 
-Let's adjust access rights: By default, **NGINX** runs as user `nginx`
+Let's adjust access rights: By default, **Nginx** runs as user `nginx`
 
 ```bash
 eval $(openssl version -d|sed 's/: /=/')
@@ -874,7 +874,7 @@ chown nginx: $cert_key_file
 
 > **Note:** The cert file should contain the full chain.
 
-#### Configuration for **NGINX**
+#### Configuration for **Nginx**
 
 Refer to the [Nginx documentation](https://nginx.org/en/docs/http/configuring_https_servers.html).
 
@@ -893,7 +893,7 @@ systemctl status nginx
 Check with:
 
 ```bash
-curl -i $aspera_node_url/ping
+curl -i $aspera_node_ext_url/ping
 ```
 
 ```yaml
@@ -917,5 +917,5 @@ ascli aoc admin node list
 Either use the numerical identifier `_my_node_id_`, or, if you know the name: `%name:"my node name"`
 
 ```bash
-ascli aoc admin node modify _my_node_id_ @json:'{"url":"'$aspera_node_url'"}'
+ascli aoc admin node modify _my_node_id_ @json:'{"url":"'$aspera_node_ext_url'"}'
 ```
