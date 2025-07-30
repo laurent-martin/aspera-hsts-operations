@@ -185,7 +185,7 @@ timedatectl set-timezone Europe/Paris
 Make sure that SELinux is disabled: execute:
 
 ```bash
-sestatus | grep mode:
+sestatus|grep mode:
 ```
 
 ```console
@@ -311,6 +311,11 @@ chown $aspera_os_user: $aspera_storage_root
 
 #### Configure token encryption key
 
+When using **Aspera Transfer Token**, those are encrypted with a symetric key.
+It needs to be provisioned, either as a static key in `aspera.conf` or as a dynamic key in Redis.
+
+##### Static token encryption key
+
 For a PoC, it can be easier to use a static token encryption key:
 
 ```bash
@@ -318,13 +323,35 @@ asconfigurator -x 'set_node_data;token_dynamic_key,false'
 asconfigurator -x "set_node_data;token_encryption_key,$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)"
 ```
 
-If you prefer to use dynamic keys (**skip** this part if you like simplicity):
+##### Dynamic token encryption key
+
+> **Note:** **Skip** this part if you like simplicity and used the static key above.
+
+Refer to the HSTS [Documentation](https://www.ibm.com/docs/en/ahts/4.4.x?topic=linux-secrets-management-askmscli).
+
+If you prefer to use dynamic keys:
+
+- First, initialize the global secret (requires a 32 bytes key, base64 encoded): using either `openssl rand -base64 32` or `head -c 32 /dev/urandom|base64` depending on your system:
+
+```bash
+openssl rand -base64 32|askmscli --set-secret-by-category=redis-primary-key
+```
+
+> **Note:** This command is done only once, and creates the SQLite DB file `/opt/aspera/etc/rootkeystore.db`. One can peek in this file with: `sqlite3 /Library/Aspera/etc/rootkeystore.db .dump`
+
+- Then, set the key for the transfer user:
+
+```bash
+askmscli --init-keystore --user=$aspera_os_user
+```
+
+> **Note:** This command creates the SQLite DB file `~xfer/.aspera/localkeystore.db` with a copy of the global secret.
+
+- Finally, enable dynamic token encryption key:
 
 ```bash
 asconfigurator -x 'set_node_data;token_dynamic_key,true'
 asconfigurator -x 'set_node_data;token_encryption_key,AS_NULL'
-tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40|askmscli --rotate --set-secret-by-category=redis-primary-key
-askmscli --init-keystore --user=$aspera_os_user
 ```
 
 #### Configure the transfer user for use with tokens
@@ -622,7 +649,7 @@ ascli config preset set default node node_admin
 #### Create the access key
 
 ```bash
-ascli node access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes | tee my_ak.txt
+ascli node access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes|tee my_ak.txt
 ```
 
 The access key credentials are displayed and saved in file: `my_ak.txt`
