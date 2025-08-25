@@ -345,7 +345,7 @@ openssl rand -base64 32|askmscli --set-secret-by-category=redis-primary-key
 askmscli --init-keystore --user=$aspera_os_user
 ```
 
-> **Note:** This command creates the SQLite DB file `~xfer/.aspera/localkeystore.db` with a copy of the global secret.
+> **Note:** This command creates the SQLite DB file `~xfer/.aspera/localkeystore.db` with a copy of the primary key.
 
 - Finally, enable dynamic token encryption key:
 
@@ -355,6 +355,8 @@ asconfigurator -x 'set_node_data;token_encryption_key,AS_NULL'
 ```
 
 #### Configure the transfer user for use with tokens
+
+When transfers are authorized with tokens (Aspera Transfer Token or Bearer token, or even Basic token) and if SSH transport is used, then the transfer user must be configured to use public key authentication with Aspera's bypass key.
 
 ```bash
 mkdir -p $aspera_home/.ssh
@@ -466,7 +468,16 @@ asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file
 
 > **Note:** The restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
 
-#### SSH configuration
+#### SSH server configuration
+
+By default, Aspera uses SSH for Aspera transfer session initiation.
+It is also possible to configure HTTPS for token-based authorization.
+As recommended by **IBM**, do not expose port 22, and prefer to use port `33001` for SSH connections for Aspera.
+One can either use a single SSH server (sshd) for both remote terminal and Aspera transfers, or use a separate SSH server for Aspera transfers.
+
+##### Common SSH server for remote access and Aspera transfers
+
+This is the simplest configuration, as one only needs to configure the SSH server to listen on port `33001` instead of `22`.
 
 Let's configure SSH to also listen on port 33001 only:
 
@@ -478,7 +489,14 @@ sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
 systemctl restart sshd
 ```
 
-> **Note:** to keep both 33001 and 22, uncomment the line: `#Port 22`
+> **Note:** to keep both 33001 and 22, uncomment the line: `#Port 22`, then restart the SSH service.
+
+##### Separate SSH server for Aspera transfers
+
+It is possible to spawn a totally separate SSH server for Aspera transfers.
+This allows to keep the default SSH server for remote access, and to use a separate SSH server for Aspera transfers with a different configuration (and port).
+
+> **TODO**
 
 #### Public IP and DNS
 
@@ -750,7 +768,7 @@ Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`):
 This command activate reporting of events from Node Daemon to the AEJ Daemon, once Node Daemon is restarted.
 
 ```bash
-asconfigurator -x 'set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_local_addr'
+asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_local_addr"
 ```
 
 Use the token from previous step in: `registration_token` variable.
