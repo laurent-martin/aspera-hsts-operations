@@ -29,10 +29,10 @@ That requires additional configuration in **Nginx**.
 
 In order to tether a self-managed node to **Aspera on Cloud**, the following are requited:
 
-- A self-managed system with admin (`root`) access, typically a Linux Virtual Machine.
+- A self-managed system with admin (`root`) access, typically a Linux Virtual Machine. (e.g. Rocky 9)
 - A public IP address where this machine is reachable on a minimum of 2 TCP ports (for Node and SSH) and 1 UDP port
 - A DNS A record (FQDN) for that IP address (or use FreeDNS, see below)
-- A TLS certificate for that FQDN (or use `letsencypt` see below: requires port TCP/443 or TCP/80)
+- A TLS certificate for that FQDN (or use `letsencypt` see below: this requires port TCP/80)
 - A license file provided by IBM. For example, an evaluation license file:
 
   `87650-AsperaEnterprise-unlim.eval.aspera-license`
@@ -123,7 +123,7 @@ Next sections will use some parameters that you will need to define.
 | `aspera_node_local_secu` | `s` for HTTPS, and empty for HTTP. It refers to the local port listened by `asperanoded`. |
 | `aspera_node_user`       | The main administrative API user who will create access keys. |
 | `aspera_node_pass`       | Password for the latter. |
-| `aspera_node_ext_port`   | The external port on which the Node API will be reachable. Typically, `443`. |
+| `aspera_https_ext_port`  | The external port on which HTTPS will be reachable. Typically, `443`. |
 | `aspera_node_ext_url`        | The URL where Node API is accessible. |
 
 For convenience, let's create a shell config file `./aspera_vars.sh` with parameters used (assuming to be `root` in `/root`).
@@ -144,8 +144,9 @@ aspera_node_local_addr=127.0.0.1
 aspera_node_local_port=9092
 aspera_node_local_secu=s
 aspera_node_local_url=http$aspera_node_local_secu://$aspera_node_local_addr:$aspera_node_local_port
-aspera_node_ext_port=443
-aspera_node_ext_url=https://$aspera_fqdn:$aspera_node_ext_port
+aspera_https_ext_port=443
+aspera_node_ext_url=https://$aspera_fqdn:$aspera_https_ext_port
+aspera_htgw_local_port=7443
 set|grep ^aspera_ > ./aspera_vars.sh
 echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> ./aspera_vars.sh
 ```
@@ -261,7 +262,7 @@ grep -qxF '/bin/aspshell' /etc/shells || (echo '/bin/aspshell' >> /etc/shells)
 
 > **Note:** Optional but it is convenient.
 Aspera logs use syslog and facility `local2`.
-By default, logs go to `/var/log/messages` with rsyslog.
+By default, logs go to `/var/log/messages` with `rsyslog`.
 
 Configure logging per process for Aspera.
 
@@ -311,7 +312,7 @@ chown $aspera_os_user: $aspera_storage_root
 
 #### Configure token encryption key
 
-When using **Aspera Transfer Token**, those are encrypted with a symetric key.
+When using **Aspera Transfer Token**, those are encrypted with a symmetric key.
 It needs to be provisioned, either as a static key in `aspera.conf` or as a dynamic key in Redis.
 
 ##### Static token encryption key
@@ -473,7 +474,7 @@ asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file
 By default, Aspera uses SSH for Aspera transfer session initiation.
 It is also possible to configure HTTPS for token-based authorization.
 As recommended by **IBM**, do not expose port 22, and prefer to use port `33001` for SSH connections for Aspera.
-One can either use a single SSH server (sshd) for both remote terminal and Aspera transfers, or use a separate SSH server for Aspera transfers.
+One can either use a single SSH server (`sshd`) for both remote terminal and Aspera transfers, or use a separate SSH server for Aspera transfers.
 
 ##### Common SSH server for remote access and Aspera transfers
 
@@ -507,7 +508,7 @@ In order to work with **Aspera on Cloud**, it is required to have a public IP ad
 | TCP/33001 | FASP Session (SSH)       |
 | UDP/33001 | FASP Data                |
 | TCP/443   | Node API (HTTPS)         |
-| TCP/80    | Useful for `letsencrypt` |
+| TCP/80    | Optional: if `letsencrypt` is used |
 
 Once the DNS name is known:
 
@@ -543,7 +544,7 @@ certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --
 
 #### Nginx
 
-Technically, **Nginx** is not required, but it is recommended when the Node API fronts Internet and it has several advantages. It :
+Technically, **Nginx** is not required, but it is recommended when the Node API fronts Internet, and it has several advantages. It :
 
 - allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port `443`,
 - simplifies the installation of certificates,
@@ -576,8 +577,8 @@ cert_chain_file=/etc/letsencrypt/live/$aspera_fqdn/fullchain.pem
 cert_key_file=/etc/letsencrypt/live/$aspera_fqdn/privkey.pem
 cat<<EOF > /etc/nginx/conf.d/aspera.conf
 server {
-  listen                     $aspera_node_ext_port ssl;
-  listen                     [::]:$aspera_node_ext_port ssl;
+  listen                     $aspera_https_ext_port ssl;
+  listen                     [::]:$aspera_https_ext_port ssl;
   server_name                _;
   root                       /usr/share/nginx/html;
   ssl_certificate            $cert_chain_file;
@@ -601,6 +602,15 @@ server {
     proxy_hide_header        Access-Control-Allow-Origin;
     add_header               Access-Control-Allow-Origin *;
     access_log               /var/log/nginx/node.access.log;
+  }
+  # HTTP Gateway
+  location /aspera/http-gwy {
+    proxy_pass                https://127.0.0.1:$aspera_htgw_local_port;
+    access_log                /var/log/nginx/httpgw.access.log;
+    proxy_http_version        1.1;
+    proxy_set_header          Upgrade \$http_upgrade;
+    proxy_set_header          Connection "Upgrade";
+    proxy_set_header          Host \$host;
   }
 }
 EOF
@@ -684,7 +694,7 @@ In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and sto
 - Access key: value from `my_ak.txt`
 - Secret: value from `my_ak.txt`
 
-## Accessing AoC using command line
+### Accessing AoC using command line
 
 Configure access to **Aspera on Cloud**: `myorg` is the name of the AoC tenancy (organization), i.e. the first part of the address of the URL.
 One can also place the URL of the org: `https://myorg.ibmaspera.com`
@@ -699,12 +709,12 @@ Then follow the Wizard.
 > AoC supports a single public key per user.
 > If the user uses the CLI from multiple systems, then the same private key shall be used on those systems (for example on the Aspera Transfer Server, and on a laptop).
 
-## Configure Aspera Event Journal Daemon (AEJD)
+### Configure Aspera Event Journal Daemon (AEJD)
 
 The Aspera Event Journal Daemon is responsible to report events from the Aspera Transfer Server, back to the Aspera on Cloud API.
 It reports file events (transfers, etc...).
 
-### Special case: HSTE
+#### Special case: HSTE
 
 If the transfer server is an **HSTS**, skip this step.
 
@@ -742,7 +752,7 @@ Its status can be shown with:
 systemctl status asperaejd
 ```
 
-### Create a node registration token
+#### Create a node registration token
 
 This token can be used a single time.
 It can be created using the AoC web UI, or using `ascli` (requires to have configured access to AoC through `ascli`, see previous section):
@@ -761,7 +771,7 @@ echo $registration_token
 
 This value will be used only once.
 
-### Activate the AEJ Daemon
+#### Activate the AEJ Daemon
 
 Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`):
 
@@ -790,6 +800,51 @@ Restart Aspera services in that order to apply the configuration:
 systemctl restart asperaejd
 systemctl restart asperanoded
 ```
+
+### Installation of HTTP Gateway
+
+The HTTP Gateway can be installed on the same server as the Aspera Transfer Server.
+
+#### Installation
+
+```bash
+rpm -Uvh ibm-aspera-httpgateway-2.3.0.156-b3b9633.x86_64.rpm
+```
+
+#### Configuration
+
+Make **HTTP Gateway** listen locally on high port.
+
+```bash
+cp /opt/aspera/httpgateway/config/{default,gatewayconfig}.properties
+sed --in-place --regexp-extended \
+--expression='s/^(serverconfig\.host)=.*/\1=127.0.0.1/' \
+--expression="s/^(serverconfig\.port)=.*/\1=$aspera_htgw_local_port/" \
+/opt/aspera/httpgateway/config/gatewayconfig.properties
+systemctl restart aspera_httpgateway
+```
+
+Auto restart on failure:
+
+```bash
+service_file=/usr/lib/systemd/system/aspera_httpgateway.service
+if ! grep -q '^Restart=' $service_file;then
+  tmpfile=$(mktemp)
+  cat > "$tmpfile" << EOF
+Restart=on-failure
+RestartSec=30s
+EOF
+  sed -i -Ee '/^\[Service\]/r '"$tmpfile"'' $service_file
+  rm -f "$tmpfile"
+  systemctl daemon-reload
+  systemctl restart aspera_httpgateway
+fi
+```
+
+#### NGINX Configuration
+
+NGINX is configured as reverse proxy for HTTP Gateway.
+See section NGINX Configuration for details.
 
 ## Maintenance operations
 
@@ -917,7 +972,7 @@ chmod 600 $cert_key_file
 chown nginx: $cert_key_file
 ```
 
-> **Note:** The cert file should contain the full chain.
+> **Note:** The certificate file should contain the full chain.
 
 #### Configuration for **Nginx**
 
