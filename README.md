@@ -29,8 +29,9 @@ That requires additional configuration in **Nginx**.
 
 In order to tether a self-managed node to **Aspera on Cloud**, the following are requited:
 
-- A self-managed system with admin (`root`) access, typically a Linux Virtual Machine. (e.g. Rocky 9)
-- A public IP address where this machine is reachable on a minimum of 2 TCP ports (for Node and SSH) and 1 UDP port
+- A self-managed **Linux** system with admin (`root`) access (e.g. Rocky 9)
+- A public IP address
+- The server is reachable on a minimum of 2 TCP ports (for Node : 443 and SSH : 33001) and 1 UDP port (for FASP : 33001), so typically TCP/443 TCP/33001 UDP/33001 (configurable)
 - A DNS A record (FQDN) for that IP address (or use FreeDNS, see below)
 - A TLS certificate for that FQDN (or use `letsencypt` see below: this requires port TCP/80)
 - A license file provided by IBM. For example, an evaluation license file:
