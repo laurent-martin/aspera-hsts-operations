@@ -21,9 +21,10 @@ The VM where HSTS will run has a direct internet connection (no forward, no reve
 If NAT is used for the Node API, then we assume here that the same port is used for external and internal, else both ports shall be listened by **Nginx** so that both external and internal users can reach it.
 If proxies are used/needed, then additional configuration can be done, not covered here.
 
-> **Note:** It is also possible to use HTTPS instead of SSH for the TCP connection for transfers.
-In that case, a single HTTPS port may be shared between node and transfer.
-That requires additional configuration in **Nginx**.
+> [!NOTE]
+> It is also possible to use HTTPS instead of SSH for the TCP connection for transfers.
+> In that case, a single HTTPS port may be shared between node and transfer.
+> That requires additional configuration in **Nginx**.
 
 ### Pre-requisites
 
@@ -99,10 +100,12 @@ Use a domain that has lower number of users, so that you are not restricted when
 
 We assume here that a compatible Virtual (or physical) Machine is installed with a RHEL-compatible Linux distribution: RHEL, Rocky Linux, Alma Linux, etc...
 
-> **Note:** The following commands are executed as `root` inside `root`'s home (`/root`).
+> [!NOTE]
+> The following commands are executed as `root` inside `root`'s home (`/root`).
 > To impersonate root, execute: `sudo -i`
->
-> **Note:** We need to generate some secrets of a minimum given length.
+
+> [!NOTE]
+> We need to generate some secrets of a minimum given length.
 > Several tools can be used for random.
 > For example, we will use `tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40` to generate a 40 character random string.
 > We could also use `openssl rand -base64 40|head -c 40` for the same.
@@ -208,12 +211,14 @@ setenforce Permissive
 sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
 ```
 
-> **Note:** One can check again with `sestatus`
+> [!NOTE]
+> One can check again with `sestatus`
 
 #### Install the Aspera CLI
 
-> **Note:** Installation of the Aspera CLI is not mandatory but simply convenient.
-It can be installed locally, or on a remote system (Windows, macOS, ...)
+> [!NOTE]
+> Installation of the Aspera CLI is not mandatory but simply convenient.
+> It can be installed locally, or on a remote system (Windows, macOS, ...)
 
 User Manual: <https://github.com/IBM/aspera-cli>
 
@@ -236,7 +241,8 @@ ascli -v
 dnf install -y $aspera_rpm
 ```
 
-> **Note:** `perl` is still required by the HSTS installer and also later by **Nginx**.
+> [!NOTE]
+> `perl` is still required by the HSTS installer and also later by **Nginx**.
 
 #### Install the license file
 
@@ -250,7 +256,8 @@ chmod a+r /opt/aspera/etc/aspera-license
 
 #### Declare the Aspera shell
 
-> **Note:** Optional, good practice, removes some warnings.
+> [!NOTE]
+> Optional, good practice, removes some warnings.
 
 As Aspera uses SSH by default, a protection is provided with a secure shell: `aspshell`.
 This shell can be declared as legitimate shell to avoid warning messages (optional):
@@ -261,9 +268,10 @@ grep -qxF '/bin/aspshell' /etc/shells || (echo '/bin/aspshell' >> /etc/shells)
 
 #### Aspera logs
 
-> **Note:** Optional but it is convenient.
-Aspera logs use syslog and facility `local2`.
-By default, logs go to `/var/log/messages` with `rsyslog`.
+> [!NOTE]
+> Optional but it is convenient.
+> Aspera logs use syslog and facility `local2`.
+> By default, logs go to `/var/log/messages` with `rsyslog`.
 
 Configure logging per process for Aspera.
 
@@ -327,7 +335,8 @@ asconfigurator -x "set_node_data;token_encryption_key,$(tr -dc 'A-Za-z0-9'</dev/
 
 ##### Dynamic token encryption key
 
-> **Note:** **Skip** this part if you like simplicity and used the static key above.
+> [!NOTE]
+> **Skip** this part if you like simplicity and used the static key above.
 
 Refer to the HSTS [Documentation](https://www.ibm.com/docs/en/ahts/4.4.x?topic=linux-secrets-management-askmscli).
 
@@ -339,7 +348,9 @@ If you prefer to use dynamic keys:
 openssl rand -base64 32|askmscli --set-secret-by-category=redis-primary-key
 ```
 
-> **Note:** This command is done only once, and creates the SQLite DB file `/opt/aspera/etc/rootkeystore.db`. One can peek in this file with: `sqlite3 /Library/Aspera/etc/rootkeystore.db .dump`
+> [!NOTE]
+> This command is done only once, and creates the SQLite DB file `/opt/aspera/etc/rootkeystore.db`.
+> One can peek in this file with: `sqlite3 /Library/Aspera/etc/rootkeystore.db .dump`
 
 - Then, set the key for the transfer user:
 
@@ -347,7 +358,8 @@ openssl rand -base64 32|askmscli --set-secret-by-category=redis-primary-key
 askmscli --init-keystore --user=$aspera_os_user
 ```
 
-> **Note:** This command creates the SQLite DB file `~xfer/.aspera/localkeystore.db` with a copy of the primary key.
+> [!NOTE]
+> This command creates the SQLite DB file `~xfer/.aspera/localkeystore.db` with a copy of the primary key.
 
 - Finally, enable dynamic token encryption key:
 
@@ -414,11 +426,13 @@ When parameters for `asperanoded` (Node API server) are modified, one shall rest
 systemctl restart asperanoded
 ```
 
-> **Note:** Similar effect can be achieved with `asnodeadmin --reload`. In case of installation, one can just restart the daemon for config reload.
+> [!NOTE]
+> Similar effect can be achieved with `asnodeadmin --reload`. In case of installation, one can just restart the daemon for config reload.
 
 #### Transfer user file restrictions
 
-> **Note:** This section is informational, you can skip to the next section if you are not interested in details.
+> [!NOTE]
+> This section is informational, you can skip to the next section if you are not interested in details.
 
 Skip to next section, if unsure.
 
@@ -433,7 +447,8 @@ Aspera glob syntax is as follows:
 - `\` escapes the next character (to protect evaluation of one of the special characters: `?*\`)
 - any other character is compared as-is
 
-> **Note:** Aspera glob match bytes (8-bit) and does not consider any multibyte encoding (such as UTF8). UTF8 match should work.
+> [!NOTE]
+> Aspera glob match bytes (8-bit) and does not consider any multibyte encoding (such as UTF8). UTF8 match should work.
 
 For example, for a restriction: `file:////data/*` :
 
@@ -468,7 +483,8 @@ Else, in order to allow any path under two locations: `/data/mnt1` and also S3 s
 asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:////data/mnt1/*|s3://mys3/bucket/*"
 ```
 
-> **Note:** The restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
+> [!NOTE]
+> The restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
 
 #### SSH server configuration
 
@@ -491,7 +507,8 @@ sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
 systemctl restart sshd
 ```
 
-> **Note:** to keep both 33001 and 22, uncomment the line: `#Port 22`, then restart the SSH service.
+> [!NOTE]
+> To keep both 33001 and 22, uncomment the line: `#Port 22`, then restart the SSH service.
 
 ##### Separate SSH server for Aspera transfers
 
@@ -541,7 +558,8 @@ Generate a certificate:
 certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --standalone
 ```
 
-> **Note:** For above command to work, the FQDN shall resolve in DNS and port TCP/443 reachable. Certificate and key is placed here: `/etc/letsencrypt/live/$aspera_fqdn/`, see [Let's encrypt documentation](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
+> [!NOTE]
+> For above command to work, the FQDN shall resolve in DNS and port TCP/443 reachable. Certificate and key is placed here: `/etc/letsencrypt/live/$aspera_fqdn/`, see [Let's encrypt documentation](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
 
 #### Nginx
 
@@ -559,8 +577,9 @@ asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_node_l
 systemctl restart asperanoded
 ```
 
-> **Note:** `s` is for HTTPS.
-Restart is required to change listening address.
+> [!NOTE]
+> `s` is for HTTPS.
+> Restart is required to change listening address.
 
 Install **Nginx**:
 
@@ -617,7 +636,8 @@ server {
 EOF
 ```
 
-> **Note:** If a reverse HTTP proxy in from of the Node API, with a different port, then include both ports in the config file above.
+> [!NOTE]
+> If a reverse HTTP proxy in from of the Node API, with a different port, then include both ports in the config file above.
 
 Then start and enable it permanently (start on reboot):
 
@@ -627,8 +647,9 @@ systemctl enable --now nginx
 
 ### Verification
 
-> **Note:** Ideally, below command shall be executed from outside the on-premise environment.
-The goal being to verify that **Aspera on Cloud** services can correctly access the on-premise server and that the certificate is well recognized from internet.
+> [!NOTE]
+> Ideally, below command shall be executed from outside the on-premise environment.
+> The goal being to verify that **Aspera on Cloud** services can correctly access the on-premise server and that the certificate is well recognized from internet.
 
 At this point, **Nginx** shall be forward requests to the Node API and an API user and transfer user shall be configured.
 
@@ -659,7 +680,8 @@ In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and sto
 - Storage: `Local Storage`
 - Path: `$aspera_storage_root`
 
-> **Note:** The Path used for access key creation must pass glob validation with the restriction list created earlier.
+> [!NOTE]
+> The Path used for access key creation must pass glob validation with the restriction list created earlier.
 > If the glob was ending with a `*`, then the Path can be any folder below the folder prefix.
 
 ### Creation of access key and node using `ascli`
@@ -706,7 +728,8 @@ ascli config wizard [myorg] aoc
 
 Then follow the Wizard.
 
-> **Note:** When using the CLI, a user will be authenticated using a private key.
+> [!NOTE]
+> When using the CLI, a user will be authenticated using a private key.
 > AoC supports a single public key per user.
 > If the user uses the CLI from multiple systems, then the same private key shall be used on those systems (for example on the Aspera Transfer Server, and on a laptop).
 
@@ -791,9 +814,10 @@ chmod 600 /opt/aspera/etc/aejd.json
 chown asperadaemon: /opt/aspera/etc/aejd.json
 ```
 
-> **Note:** As of 4.4.5 HSTS, the command `asp-cloud-config` has a defect where the config file `aejd.conf` is created in `$PWD/../etc` instead of `/opt/aspera/etc` if the command is executed without a full path.
-So either move to `/opt/aspera/bin/` before executing, or use the full path to the command like proposed here.
-Also, the resulting file `aejd.json` shall be readable by user `asperadaemon`.
+> [!NOTE]
+> As of 4.4.5 HSTS, the command `asp-cloud-config` has a defect where the config file `aejd.conf` is created in `$PWD/../etc` instead of `/opt/aspera/etc` if the command is executed without a full path.
+> So either move to `/opt/aspera/bin/` before executing, or use the full path to the command like proposed here.
+> Also, the resulting file `aejd.json` shall be readable by user `asperadaemon`.
 
 Restart Aspera services in that order to apply the configuration:
 
@@ -942,7 +966,8 @@ getent hosts $aspera_fqdn
 127.0.0.1 localhost newhost.example.com
 ```
 
-> **Note:** This entry in `/etc/hosts` is used in case of a local HSTS transfer, in AoC that is the case for a move or a copy.
+> [!NOTE]
+> This entry in `/etc/hosts` is used in case of a local HSTS transfer, in AoC that is the case for a move or a copy.
 
 #### Storing the certificate and private key
 
@@ -973,7 +998,8 @@ chmod 600 $cert_key_file
 chown nginx: $cert_key_file
 ```
 
-> **Note:** The certificate file should contain the full chain.
+> [!NOTE]
+> The certificate file should contain the full chain.
 
 #### Configuration for **Nginx**
 
