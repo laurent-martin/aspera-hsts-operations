@@ -1,5 +1,7 @@
 # IBM Aspera HSTS as tethered node in AoC
 
+## Introduction
+
 The procedure is documented in the **Aspera on Cloud** manual:
 
 <https://ibmaspera.com/help/0_tethered_map>
@@ -13,7 +15,9 @@ This is adapted for evaluations or to use a perpetual license.
 
 This procedure is especially adapted to set up a self-managed **Aspera High-Speed Transfer Server** (HSTS) or **Aspera High-Speed Transfer Endpoint** (HSTE) as a tethered node to **Aspera on Cloud** (AoC) for a Proof of Concept (PoC) or evaluation.
 
-## Installation and Configuration
+> [!NOTE]
+> For Aspera Endpoint (HSTE), transfers with Connect Client version 3 is not supported.
+> Also, a special configuration is required (see later)
 
 ### Assumptions
 
@@ -31,6 +35,7 @@ If proxies are used/needed, then additional configuration can be done, not cover
 In order to tether a self-managed node to **Aspera on Cloud**, the following are requited:
 
 - A self-managed **Linux** system with admin (`root`) access (e.g. Rocky 9)
+- [Official hardware requirements](https://www.ibm.com/support/pages/system-sizing-guidelines-aspera-transfer-products), typically 4 cores, 8GB RAM
 - A public IP address
 - The server is reachable on a minimum of 2 TCP ports (for Node : 443 and SSH : 33001) and 1 UDP port (for FASP : 33001), so typically TCP/443 TCP/33001 UDP/33001 (configurable)
 - A DNS A record (FQDN) for that IP address (or use FreeDNS, see below)
@@ -42,6 +47,10 @@ In order to tether a self-managed node to **Aspera on Cloud**, the following are
 - The installation package for HSTS: for example:
 
   `ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm`
+
+> [!NOTE]
+> The installation is also possible on other OS (macOS, Windows, ...),
+> but this manual focusses on Linux.
 
 ### Download the HSTS RPM
 
@@ -94,9 +103,9 @@ A FQDN (DNS A Record) is required for the public address of the HSTS.
 
 If none is defined, it is possible to use a free service like [FreeDNS](https://freedns.afraid.org/) for that (PoC).
 
-Use a domain that has lower number of users, so that you are not restricted when you'll generate the `letsencrypt` cert.
+Use a domain in freedns that has lower number of users, so that you are not restricted when you'll generate the `letsencrypt` cert.
 
-### Installation and configuration of tethered node
+## Installation and configuration of tethered node
 
 We assume here that a compatible Virtual (or physical) Machine is installed with a RHEL-compatible Linux distribution: RHEL, Rocky Linux, Alma Linux, etc...
 
@@ -110,7 +119,7 @@ We assume here that a compatible Virtual (or physical) Machine is installed with
 > For example, we will use `tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40` to generate a 40 character random string.
 > We could also use `openssl rand -base64 40|head -c 40` for the same.
 
-#### Parameters
+### Installation parameters
 
 Next sections will use some parameters that you will need to define.
 
@@ -167,11 +176,10 @@ Once modified, reload the values:
 source ./aspera_vars.sh
 ```
 
-At any time, if you open a new terminal, you can reload the configuration variables with above command.
+> [!TIP] At any time, if you open a new terminal, you can reload the configuration variables with above command.
+> If you like, you may set the `PATH` in your shell profile as above.
 
-If you like, you may set the `PATH` in your shell profile as above.
-
-#### General system settings
+### General system settings
 
 Check that the system has date synchronization:
 
@@ -211,10 +219,10 @@ setenforce Permissive
 sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
 ```
 
-> [!NOTE]
+> [!TIP]
 > One can check again with `sestatus`
 
-#### Install the Aspera CLI
+### Install the Aspera CLI
 
 > [!NOTE]
 > Installation of the Aspera CLI is not mandatory but simply convenient.
@@ -235,7 +243,7 @@ Check installation with:
 ascli -v
 ```
 
-#### Install the HSTS software
+### Install the HSTS software
 
 ```bash
 dnf install -y $aspera_rpm
@@ -244,7 +252,7 @@ dnf install -y $aspera_rpm
 > [!NOTE]
 > `perl` is still required by the HSTS installer and also later by **Nginx**.
 
-#### Install the license file
+### Install the license file
 
 It goes to `/opt/aspera/etc/aspera-license`.
 This file must be world-readable, or at least readable by `asperadaemons` and transfer users (`xfer`).
@@ -254,7 +262,7 @@ cp $aspera_eval_lic /opt/aspera/etc/aspera-license
 chmod a+r /opt/aspera/etc/aspera-license
 ```
 
-#### Declare the Aspera shell
+### Declare the Aspera shell
 
 > [!NOTE]
 > Optional, good practice, removes some warnings.
@@ -266,7 +274,7 @@ This shell can be declared as legitimate shell to avoid warning messages (option
 grep -qxF '/bin/aspshell' /etc/shells || (echo '/bin/aspshell' >> /etc/shells)
 ```
 
-#### Aspera logs
+### Aspera logs
 
 > [!NOTE]
 > Optional but it is convenient.
@@ -296,11 +304,12 @@ done
 systemctl restart rsyslog
 ```
 
-#### Create transfer user
+### Create transfer user
 
 When used with **Aspera on Cloud**, all transfers are executed under a single technical user (transfer user): `xfer`, specified by `$aspera_os_user`.
 Optionally we can create a group `asperausers` in case we need to manage multiple transfer users.
 We make sure to block password-based login with that user and ensure it never expires.
+
 Create this user:
 
 ```bash
@@ -310,7 +319,7 @@ passwd --lock $aspera_os_user
 chage --mindays 0 --maxdays 99999 --inactive -1 --expiredate -1 $aspera_os_user
 ```
 
-#### Define storage location root
+### Define storage location root
 
 Let's create some main storage location that will be used by Aspera and make it accessible by the transfer user:
 
@@ -319,7 +328,7 @@ mkdir -p $aspera_storage_root
 chown $aspera_os_user: $aspera_storage_root
 ```
 
-#### Configure token encryption key
+### Configure token encryption key
 
 When using **Aspera Transfer Token**, those are encrypted with a symmetric key.
 It needs to be provisioned, either as a static key in `aspera.conf` or as a dynamic key in Redis.
@@ -368,7 +377,7 @@ asconfigurator -x 'set_node_data;token_dynamic_key,true'
 asconfigurator -x 'set_node_data;token_encryption_key,AS_NULL'
 ```
 
-#### Configure the transfer user for use with tokens
+### Configure the transfer user for use with tokens
 
 When transfers are authorized with tokens (Aspera Transfer Token or Bearer token, or even Basic token) and if SSH transport is used, then the transfer user must be configured to use public key authentication with Aspera's bypass key.
 
@@ -379,7 +388,7 @@ chmod -R go-rwx $aspera_home/.ssh
 chown -R $aspera_os_user: $aspera_home
 ```
 
-#### Other configuration for AoC
+### Other configuration for AoC
 
 **Aspera on Cloud** requires activity logging:
 
@@ -397,7 +406,7 @@ asconfigurator -x 'set_server_data;files_cache_ttl,0'
 
 Folder caching is useful when reading folder content is slow, due to slow storage or large number of files in folders.
 
-#### Node API user
+### Node API user
 
 In order to access the API of HSTS, so we can create an access key, we have to provision an API user:
 
@@ -429,7 +438,7 @@ systemctl restart asperanoded
 > [!NOTE]
 > Similar effect can be achieved with `asnodeadmin --reload`. In case of installation, one can just restart the daemon for config reload.
 
-#### Transfer user file restrictions
+### Transfer user file restrictions
 
 > [!NOTE]
 > This section is informational, you can skip to the next section if you are not interested in details.
@@ -486,7 +495,7 @@ asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file
 > [!NOTE]
 > The restriction list does not define the storage location, it is a protection to limit the creation of access keys to only some locations.
 
-#### SSH server configuration
+### SSH server configuration
 
 By default, Aspera uses SSH for Aspera transfer session initiation.
 It is also possible to configure HTTPS for token-based authorization.
@@ -517,7 +526,7 @@ This allows to keep the default SSH server for remote access, and to use a separ
 
 > **TODO**
 
-#### Public IP and DNS
+### Public IP and DNS
 
 In order to work with **Aspera on Cloud**, it is required to have a public IP address on which the following ports are open:
 
@@ -536,7 +545,7 @@ hostname $aspera_fqdn
 hostname
 ```
 
-#### Certificate with let's encrypt
+### Certificate with let's encrypt
 
 A TLS certificate is required for above FQDN.
 
@@ -561,7 +570,7 @@ certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --
 > [!NOTE]
 > For above command to work, the FQDN shall resolve in DNS and port TCP/443 reachable. Certificate and key is placed here: `/etc/letsencrypt/live/$aspera_fqdn/`, see [Let's encrypt documentation](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
 
-#### Nginx
+### Nginx
 
 Technically, **Nginx** is not required, but it is recommended when the Node API fronts Internet, and it has several advantages. It :
 
@@ -688,7 +697,7 @@ In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and sto
 
 Here, we are going to create the access key using the CLI, which uses the node API.
 
-#### Configure `ascli`
+### Configure `ascli`
 
 Configure access to Node API:
 
@@ -697,7 +706,7 @@ ascli config preset update node_admin --url=$aspera_node_ext_url --username=$asp
 ascli config preset set default node node_admin
 ```
 
-#### Create the access key
+### Create the access key
 
 ```bash
 ascli node access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes|tee my_ak.txt
@@ -705,7 +714,7 @@ ascli node access_keys create @json:'{"storage":{"type":"local","path":"'$aspera
 
 The access key credentials are displayed and saved in file: `my_ak.txt`
 
-#### Create the node
+### Create the node
 
 In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
 
@@ -738,7 +747,7 @@ Then follow the Wizard.
 The Aspera Event Journal Daemon is responsible to report events from the Aspera Transfer Server, back to the Aspera on Cloud API.
 It reports file events (transfers, etc...).
 
-#### Special case: HSTE
+### Special case: HSTE
 
 If the transfer server is an **HSTS**, skip this step.
 
@@ -776,7 +785,7 @@ Its status can be shown with:
 systemctl status asperaejd
 ```
 
-#### Create a node registration token
+### Create a node registration token
 
 This token can be used a single time.
 It can be created using the AoC web UI, or using `ascli` (requires to have configured access to AoC through `ascli`, see previous section):
@@ -795,7 +804,7 @@ echo $registration_token
 
 This value will be used only once.
 
-#### Activate the AEJ Daemon
+### Activate the AEJ Daemon
 
 Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`):
 
