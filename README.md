@@ -126,18 +126,19 @@ Next sections will use some parameters that you will need to define.
 | Parameter                | Description |
 |--------------------------|-------------|
 | `aspera_cert_email`      | Place your email, this is used by `letsencrypt` to notify you when the certificate will expire. |
-| `aspera_fqdn`            | Place your server's DNS address. For example, I used IBM Techzone and FreeDNS: `itzvsi-f0pjbk8h.mojok.org` |
-| `aspera_rpm`             | Path to the HSTS RPM that you downloaded, e.g. `./ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm` |
-| `aspera_eval_lic`        | Path to the Aspera HSTS license file, e.g. `./87650-AsperaEnterprise-unlim.eval.aspera-license` |
-| `aspera_os_user`         | Typically `xfer`. The operating system user under which transfers will be executed. |
-| `aspera_home`            | The home folder of the transfer user. Typically: `/home/xfer` |
+| `aspera_fqdn`            | Place your server's DNS address.<br/>For example, I used IBM Techzone and FreeDNS: `itzvsi-f0pjbk8h.mojok.org` |
+| `aspera_rpm`             | Path to the HSTS RPM that you downloaded.<br/>e.g. `./ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm` |
+| `aspera_eval_lic`        | Path to the Aspera HSTS license file.<br/>e.g. `./87650-AsperaEnterprise-unlim.eval.aspera-license` |
+| `aspera_os_user`         | Typically `xfer`.<br/>The operating system user under which transfers will be executed. |
+| `aspera_home`            | The home folder of the transfer user.<br/>Typically: `/home/xfer` |
 | `aspera_storage_root`    | The top folder under which Aspera will transfer files. |
 | `aspera_node_local_port` | The local port where `asperanoded` listens. |
-| `aspera_node_local_secu` | `s` for HTTPS, and empty for HTTP. It refers to the local port listened by `asperanoded`. |
+| `aspera_node_local_secu` | `s` for HTTPS, and empty for HTTP.<br/>It refers to the local port listened by `asperanoded`. |
 | `aspera_node_user`       | The main administrative API user who will create access keys. |
 | `aspera_node_pass`       | Password for the latter. |
 | `aspera_https_ext_port`  | The external port on which HTTPS will be reachable. Typically, `443`. |
-| `aspera_node_ext_url`        | The URL where Node API is accessible. |
+| `aspera_node_ext_url`    | The URL where Node API is accessible. |
+| `aspera_hsts_folder`    | The installation folder of HSTS. |
 
 For convenience, let's create a shell config file `./aspera_vars.sh` with parameters used (assuming to be `root` in `/root`).
 Execute the following commands in a terminal:
@@ -160,8 +161,9 @@ aspera_node_local_url=http$aspera_node_local_secu://$aspera_node_local_addr:$asp
 aspera_https_ext_port=443
 aspera_node_ext_url=https://$aspera_fqdn:$aspera_https_ext_port
 aspera_htgw_local_port=7443
+aspera_hsts_folder=/opt/aspera
 set|grep ^aspera_ > ./aspera_vars.sh
-echo 'PATH=/opt/aspera/bin:/usr/local/bin:$PATH' >> ./aspera_vars.sh
+echo 'PATH=$aspera_hsts_folder/bin:/usr/local/bin:$PATH' >> ./aspera_vars.sh
 ```
 
 Once created, edit the generated file `./aspera_vars.sh` and customize with your own values.
@@ -201,7 +203,7 @@ Make sure that SELinux is disabled: execute:
 sestatus|grep mode:
 ```
 
-```console
+```text
 Current mode:                   permissive
 ```
 
@@ -254,12 +256,12 @@ dnf install -y $aspera_rpm
 
 ### Install the license file
 
-It goes to `/opt/aspera/etc/aspera-license`.
+It goes to `$aspera_hsts_folder/etc/aspera-license`.
 This file must be world-readable, or at least readable by `asperadaemons` and transfer users (`xfer`).
 
 ```bash
-cp $aspera_eval_lic /opt/aspera/etc/aspera-license
-chmod a+r /opt/aspera/etc/aspera-license
+cp $aspera_eval_lic $aspera_hsts_folder/etc/aspera-license
+chmod a+r $aspera_hsts_folder/etc/aspera-license
 ```
 
 ### Declare the Aspera shell
@@ -333,7 +335,7 @@ chown $aspera_os_user: $aspera_storage_root
 When using **Aspera Transfer Token**, those are encrypted with a symmetric key.
 It needs to be provisioned, either as a static key in `aspera.conf` or as a dynamic key in Redis.
 
-##### Static token encryption key
+#### Static token encryption key
 
 For a PoC, it can be easier to use a static token encryption key:
 
@@ -342,10 +344,10 @@ asconfigurator -x 'set_node_data;token_dynamic_key,false'
 asconfigurator -x "set_node_data;token_encryption_key,$(tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)"
 ```
 
-##### Dynamic token encryption key
+#### Dynamic token encryption key
 
 > [!NOTE]
-> **Skip** this part if you like simplicity and used the static key above.
+> **Skip** this part if you like simplicity and keep the static key above.
 
 Refer to the HSTS [Documentation](https://www.ibm.com/docs/en/ahts/4.4.x?topic=linux-secrets-management-askmscli).
 
@@ -358,8 +360,8 @@ openssl rand -base64 32|askmscli --set-secret-by-category=redis-primary-key
 ```
 
 > [!NOTE]
-> This command is done only once, and creates the SQLite DB file `/opt/aspera/etc/rootkeystore.db`.
-> One can peek in this file with: `sqlite3 /Library/Aspera/etc/rootkeystore.db .dump`
+> This command is done only once, and creates the SQLite DB file `$aspera_hsts_folder/etc/rootkeystore.db`.
+> One can peek in this file with: `sqlite3 $aspera_hsts_folder/etc/rootkeystore.db .dump`
 
 - Then, set the key for the transfer user:
 
@@ -383,7 +385,7 @@ When transfers are authorized with tokens (Aspera Transfer Token or Bearer token
 
 ```bash
 mkdir -p $aspera_home/.ssh
-cp /opt/aspera/var/aspera_tokenauth_id_rsa.pub $aspera_home/.ssh/authorized_keys
+cp $aspera_hsts_folder/var/aspera_tokenauth_id_rsa.pub $aspera_home/.ssh/authorized_keys
 chmod -R go-rwx $aspera_home/.ssh
 chown -R $aspera_os_user: $aspera_home
 ```
@@ -411,7 +413,7 @@ Folder caching is useful when reading folder content is slow, due to slow storag
 In order to access the API of HSTS, so we can create an access key, we have to provision an API user:
 
 ```bash
-/opt/aspera/bin/asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
+$aspera_hsts_folder/bin/asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
 ```
 
 Access keys created with this API user will enable transfers that will be running on the host under user `$aspera_os_user`.
@@ -477,8 +479,12 @@ If we want to restrict creation of access keys to only folders under the selecte
 asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
 ```
 
-Internally, in HSTS, storage locations are stored as a URI.
-I.e. `[scheme]://[storage server+credential]/[path]?[parameters]`.
+Internally, in HSTS, storage locations are stored as a URI:
+
+```text
+[scheme]://[storage server+credential]/[path]?[parameters]
+```
+
 For local storage, `[scheme]` is `file`, and the absolute path starts with `/`.
 For example, for a local storage `/data`, the URL would be `file:////data`.
 
@@ -516,7 +522,7 @@ sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
 systemctl restart sshd
 ```
 
-> [!NOTE]
+> [!TIP]
 > To keep both 33001 and 22, uncomment the line: `#Port 22`, then restart the SSH service.
 
 ##### Separate SSH server for Aspera transfers
@@ -572,7 +578,8 @@ certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --
 
 ### Nginx
 
-Technically, **Nginx** is not required, but it is recommended when the Node API fronts Internet, and it has several advantages. It :
+Technically, **Nginx** is not required, but it is recommended when the Node API faces Internet, and it has several advantages.
+It :
 
 - allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port `443`,
 - simplifies the installation of certificates,
@@ -590,11 +597,13 @@ systemctl restart asperanoded
 > `s` is for HTTPS.
 > Restart is required to change listening address.
 
-Install **Nginx**:
+#### Install **Nginx**
 
 ```bash
 dnf install -y nginx
 ```
+
+#### Configure **Nginx**
 
 Create a configuration file for **Nginx**:
 
@@ -604,7 +613,7 @@ Create a configuration file for **Nginx**:
 ```bash
 cert_chain_file=/etc/letsencrypt/live/$aspera_fqdn/fullchain.pem
 cert_key_file=/etc/letsencrypt/live/$aspera_fqdn/privkey.pem
-cat<<EOF > /etc/nginx/conf.d/aspera.conf
+cat << EOF > /etc/nginx/conf.d/aspera.conf
 server {
   listen                     $aspera_https_ext_port ssl;
   listen                     [::]:$aspera_https_ext_port ssl;
@@ -645,8 +654,8 @@ server {
 EOF
 ```
 
-> [!NOTE]
-> If a reverse HTTP proxy in from of the Node API, with a different port, then include both ports in the config file above.
+> [!TIP]
+> If a reverse HTTP proxy is placed in front of the Node API, with a different port, then include both ports in the config file above.
 
 Then start and enable it permanently (start on reboot):
 
@@ -654,13 +663,13 @@ Then start and enable it permanently (start on reboot):
 systemctl enable --now nginx
 ```
 
-### Verification
+#### Verification
 
 > [!NOTE]
 > Ideally, below command shall be executed from outside the on-premise environment.
 > The goal being to verify that **Aspera on Cloud** services can correctly access the on-premise server and that the certificate is well recognized from internet.
 
-At this point, **Nginx** shall be forward requests to the Node API and an API user and transfer user shall be configured.
+At this point, **Nginx** shall forward requests to the Node API and an API user and transfer user shall be configured.
 
 Check with:
 
@@ -677,7 +686,7 @@ Check that the following values are set like this:
 
 ### Creation of access key and node using AoC web UI
 
-In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and storage` &rarr; `Create new +`
+In the **Aspera on Cloud** web UI, navigate to `[App Selector]` &rarr; `Admin` &rarr; `Nodes and storage` &rarr; `Create new +`
 
 - Select tab: `Attach my Aspera server`
 - **Name**: anything you like to identify this node by name
@@ -697,7 +706,7 @@ In the **Aspera on Cloud** web UI, navigate to `Admin app` &rarr; `Nodes and sto
 
 Here, we are going to create the access key using the CLI, which uses the node API.
 
-### Configure `ascli`
+#### Configure `ascli`
 
 Configure access to Node API:
 
@@ -706,7 +715,7 @@ ascli config preset update node_admin --url=$aspera_node_ext_url --username=$asp
 ascli config preset set default node node_admin
 ```
 
-### Create the access key
+#### Create the access key
 
 ```bash
 ascli node access_keys create @json:'{"storage":{"type":"local","path":"'$aspera_storage_root'"}}' --show-secrets=yes|tee my_ak.txt
@@ -747,7 +756,7 @@ Then follow the Wizard.
 The Aspera Event Journal Daemon is responsible to report events from the Aspera Transfer Server, back to the Aspera on Cloud API.
 It reports file events (transfers, etc...).
 
-### Special case: HSTE
+#### Special case: HSTE
 
 If the transfer server is an **HSTS**, skip this step.
 
@@ -772,7 +781,8 @@ Restart=always
 RestartSec=10s
 ```
 
-Then activate **AEJD**. Execute as root:
+Then activate **AEJD**.
+Execute as root:
 
 ```bash
 /opt/aspera/etc/setup/setup-systemd.sh enable
@@ -785,7 +795,7 @@ Its status can be shown with:
 systemctl status asperaejd
 ```
 
-### Create a node registration token
+#### Create a node registration token
 
 This token can be used a single time.
 It can be created using the AoC web UI, or using `ascli` (requires to have configured access to AoC through `ascli`, see previous section):
@@ -804,9 +814,9 @@ echo $registration_token
 
 This value will be used only once.
 
-### Activate the AEJ Daemon
+#### Activate the AEJ Daemon
 
-Execute as `root` (Still assuming that `/opt/aspera/bin/` is in the `PATH`):
+Execute as `root` (Still assuming that `$aspera_hsts_folder/bin/` is in the `PATH`):
 
 This command activate reporting of events from Node Daemon to the AEJ Daemon, once Node Daemon is restarted.
 
@@ -911,10 +921,10 @@ Any customization to the OS must be restored, such as the ones listed in this do
 
 The following files shall be backed up:
 
-- `/opt/aspera/etc/aspera.conf`
-- `/opt/aspera/etc/aspera-license`
-- `/opt/aspera/etc/conf.d/node_id.conf`
-- `/opt/aspera/etc/conf.d/cluster_id.conf`
+- `$aspera_hsts_folder/etc/aspera.conf`
+- `$aspera_hsts_folder/etc/aspera-license`
+- `$aspera_hsts_folder/etc/conf.d/node_id.conf`
+- `$aspera_hsts_folder/etc/conf.d/cluster_id.conf`
 
 #### HSTS Redis DB
 
@@ -949,13 +959,13 @@ Check with:
 hostname
 ```
 
-```console
+```text
 newhost.example.com
 ```
 
 Edit the file: `/etc/hosts`, and, at the end of the line with `127.0.0.1`, add that FQDN:
 
-```console
+```text
 127.0.0.1 localhost newhost.example.com
 ```
 
@@ -971,12 +981,13 @@ Check with (or with `ping`):
 getent hosts $aspera_fqdn
 ```
 
-```console
+```text
 127.0.0.1 localhost newhost.example.com
 ```
 
 > [!NOTE]
-> This entry in `/etc/hosts` is used in case of a local HSTS transfer, in AoC that is the case for a move or a copy.
+> This entry in `/etc/hosts` is used in case of a local HSTS transfer.
+> In AoC that's the case for a move or a copy.
 
 #### Storing the certificate and private key
 
@@ -987,7 +998,7 @@ It can be anywhere, including a standard location:
 openssl version -d
 ```
 
-```console
+```text
 OPENSSLDIR: "/etc/pki/tls"
 ```
 
