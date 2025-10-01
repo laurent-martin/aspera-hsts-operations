@@ -52,6 +52,10 @@ In order to tether a self-managed node to **Aspera on Cloud**, the following are
 > The installation is also possible on other OS (macOS, Windows, ...),
 > but this manual focusses on Linux.
 
+### Network and ports
+
+![Network Ports](diagrams.png)
+
 ### Download the HSTS RPM
 
 To download the RPM for HSTS (or HSTE), one can use the following methods:
