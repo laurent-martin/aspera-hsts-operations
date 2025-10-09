@@ -207,14 +207,16 @@ Once modified, reload the values:
 source ./aspera_vars.sh
 ```
 
-> [!TIP] At any time, if you open a new terminal, you can reload the configuration variables with above command.
+> [!TIP]
+> At any time, if you open a new terminal, you can reload the configuration variables with above command.
 > If you like, you may set the `PATH` in your shell profile as above.
 
 ### General system settings
 
 #### General configuration: Linux
 
-> [!NOTE] Linux only.
+> [!NOTE]
+> Linux only.
 
 Once the DNS name is known:
 
@@ -274,7 +276,8 @@ sudo sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
 
 #### General configuration: macOS
 
-> [!NOTE] macOS only.
+> [!NOTE]
+> macOS only.
 
 Check macOs version:
 
@@ -528,13 +531,15 @@ When parameters for `asperanoded` (Node API server) are modified, one shall rest
 > Similar effect can be achieved with `asnodeadmin --reload`.
 > In case of installation, one can just restart the daemon for config reload.
 
-> [!NOTE] Linux only
+> [!NOTE]
+> Linux only
 
 ```shell
 systemctl restart asperanoded
 ```
 
-> [!NOTE] macOS only
+> [!NOTE]
+> macOS only
 
 ```shell
 sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
@@ -550,7 +555,8 @@ One can either use a single SSH server (`sshd`) for both remote terminal and Asp
 
 #### SSH Server configuration: Linux
 
-> [!NOTE] Linux only
+> [!NOTE]
+> Linux only
 
 This is the simplest configuration, as one only needs to configure the SSH server to listen on port `33001` instead of `22`.
 
@@ -569,7 +575,8 @@ systemctl restart sshd
 
 #### SSH Server configuration: macOs
 
-> [!NOTE] macOS only
+> [!NOTE]
+> macOS only
 
 ```shell
 sudo sed -i.bak -E 's/^(ssh[[:space:]]+)[0-9]+(\/tcp.*)/\133001\2/' /etc/services
@@ -861,7 +868,8 @@ It reports file events (transfers, etc...).
 
 #### Special case: HSTE
 
-> [!NOTE] Linux only.
+> [!NOTE]
+> Linux only.
 
 If the transfer server is an **HSTS**, skip this step.
 
@@ -952,7 +960,8 @@ systemctl restart asperanoded
 
 ### Installation of HTTP Gateway
 
-> [!NOTE] Linux only.
+> [!NOTE]
+> Linux only.
 
 The HTTP Gateway can be installed on the same server as the Aspera Transfer Server.
 
