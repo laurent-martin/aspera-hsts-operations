@@ -49,12 +49,12 @@ In order to tether a self-managed node to **Aspera on Cloud**, the following are
   `ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm`
 
 > [!NOTE]
-> The installation is also possible on other OS (macOS, Windows, ...).
+> The installation is also possible on other supported OS (macOS, Windows, ...).
 > This manual focusses on Linux.
 
 ### Network and ports
 
-In order to work with **Aspera on Cloud**, it is required to have a public IP address on which the following ports are open:
+In order to work with **Aspera on Cloud**, it is required to have a **public IP address** on which the following ports are open:
 
 | Port      | Usage                              |
 |-----------|------------------------------------|
@@ -65,10 +65,13 @@ In order to work with **Aspera on Cloud**, it is required to have a public IP ad
 
 > [!NOTE]
 > Let's encrypt can be used on either port 80 or port 443.
+> See later in this document.
 
 ![Network Ports](diagrams.png)
 
 ## Preparation
+
+Before starting the actual installation and configuration, some elements shall be prepared in advance.
 
 ### Download the HSTS/HSTE installation package
 
@@ -427,6 +430,8 @@ chage --mindays 0 --maxdays 99999 --inactive -1 --expiredate -1 $aspera_os_user
 
 #### Transfer user: macOS
 
+Create a user group: `asperausers` and user ``
+
 ```shell
 aspera_group=asperausers
 if ! dscl . -read /Groups/$aspera_group &>/dev/null; then
@@ -438,13 +443,19 @@ if ! id "$aspera_os_user" &>/dev/null; then
   sudo dscl . -create /Users/$aspera_os_user
   sudo dscl . -create /Users/$aspera_os_user UserShell /bin/aspshell
   sudo dscl . -create /Users/$aspera_os_user RealName "Aspera User"
-  sudo dscl . -create /Users/$aspera_os_user UniqueID "$(dscl . -list /Users UniqueID | awk '{print $2}' | sort -n | tail -1 | awk '{print $1+1}')"
+  sudo dscl . -create /Users/$aspera_os_user UniqueID "$(dscl . -list /Users UniqueID | awk 'max<$2{max=$2} END{print max+1}')"
   sudo dscl . -create /Users/$aspera_os_user PrimaryGroupID "$(dscl . -read /Groups/$aspera_group PrimaryGroupID | awk '{print $2}')"
   sudo dscl . -create /Users/$aspera_os_user NFSHomeDirectory /Users/$aspera_os_user
   sudo createhomedir -c -u $aspera_os_user > /dev/null
 fi
 sudo pwpolicy -u $aspera_os_user -setpolicy "isDisabled=1"
 sudo pwpolicy -u $aspera_os_user -clearaccountpolicies
+```
+
+Allows user for ssh:
+
+```shell
+sudo dseditgroup -o edit -a xfer -t user com.apple.access_ssh
 ```
 
 ### Define storage location root
@@ -491,7 +502,7 @@ sudo asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_
 ```
 
 By default, the HSTS uses caching for folder contents.
-To deactivate folder content caching, execute (Optional):
+To deactivate folder content caching, execute (Optional, Default: 5m):
 
 ```shell
 sudo asconfigurator -x 'set_server_data;files_cache_ttl,0'
@@ -532,14 +543,14 @@ When parameters for `asperanoded` (Node API server) are modified, one shall rest
 > In case of installation, one can just restart the daemon for config reload.
 
 > [!NOTE]
-> Linux only
+> Linux only:
 
 ```shell
 systemctl restart asperanoded
 ```
 
 > [!NOTE]
-> macOS only
+> macOS only:
 
 ```shell
 sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
@@ -556,7 +567,7 @@ One can either use a single SSH server (`sshd`) for both remote terminal and Asp
 #### SSH Server configuration: Linux
 
 > [!NOTE]
-> Linux only
+> Linux only.
 
 This is the simplest configuration, as one only needs to configure the SSH server to listen on port `33001` instead of `22`.
 
@@ -593,14 +604,14 @@ sudo lsof -iTCP:33001 -sTCP:LISTEN
 
 ```shell
 cert_folder=_path_to_folder_
-cert_chain_file=$cert_folder/_full_chain_file_
-cert_key_file=$cert_folder/_key_file_
+cert_fullchain_path=$cert_folder/_full_chain_file_
+cert_fullchain_path=$cert_folder/_key_file_
 ```
 
 #### Using let's encrypt and certbot: Linux
 
 > [!NOTE]
-> Linux only
+> Linux only.
 
 A TLS certificate is required for above FQDN.
 
@@ -621,8 +632,9 @@ Generate a certificate:
 ```shell
 certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --standalone
 cert_folder=/etc/letsencrypt/live/$aspera_fqdn
-cert_chain_file=$cert_folder/fullchain.pem
-cert_key_file=$cert_folder/privkey.pem
+cert_fullchain_path=$cert_folder/fullchain.pem
+cert_only_path=$cert_folder/
+cert_privkey_path=$cert_folder/privkey.pem
 ```
 
 > [!NOTE]
@@ -642,10 +654,37 @@ Generate certificate using [tls-alpn-01 challenge on port 443](https://letsencry
 acme.sh --set-default-ca --server letsencrypt
 acme.sh --register-account -m $aspera_cert_email
 acme.sh --issue --alpn --tlsport $aspera_https_local_port -d $aspera_fqdn
-cert_folder=$(dirname $(acme.sh --info -d $aspera_fqdn|sed -n 's/DOMAIN_CONF=//p'))
-cert_chain_file=$cert_folder/fullchain.cer
-cert_key_file=$cert_folder/$aspera_fqdn.key
+cert_folder=$(dirname $(acme.sh --info -d $aspera_fqdn|sed -n 's/^DOMAIN_CONF=//p'))
+cert_fullchain_path=$cert_folder/fullchain.cer
+cert_intermediate_path=$cert_folder/ca.cer
+cert_only_path=$cert_folder/$aspera_fqdn.cer
+cert_privkey_path=$cert_folder/$aspera_fqdn.key
 set|grep ^cert_
+```
+
+### Not using Nginx
+
+> [!NOTE]
+> macOS only.
+
+If `asperanoded` is used directly without `nginx`, then a certificate shall be installed:
+
+```shell
+sudo asconfigurator -x "set_server_data;key_file,$cert_privkey_path;cert_file,$cert_only_path;chain_file,$cert_intermediate_path"
+```
+
+To add user to group `aspadmins`:
+
+```shell
+sudo dseditgroup -o edit -a laurent -t user aspadmins
+```
+
+To change a folder to group aspadmins:
+
+```shell
+chgrp aspadmins .
+chgrp -R aspadmins .acme.sh
+chmod g+r $cert_privkey_path
 ```
 
 ### Nginx
@@ -660,6 +699,10 @@ It :
 
 #### Change `asperanoded` local port
 
+> [!NOTE]
+> Do this part only if you want to front-end `asperanoded` with nginx
+> and possibly share the HTTPS port between multiple applications
+
 Since we will use **Nginx** as reverse proxy, we can make Node API listen locally only:
 
 ```shell
@@ -670,14 +713,14 @@ sudo asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_n
 Restart is required to change listening address.
 
 > [!WARNING]
-> Linux only
+> Linux only:
 
 ```shell
 systemctl restart asperanoded
 ```
 
 > [!WARNING]
-> macOS only
+> macOS only:
 
 ```shell
 sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
@@ -717,8 +760,8 @@ http {
     listen                     [::]:$aspera_https_local_port ssl;
     server_name                _;
     root                       /usr/share/nginx/html;
-    ssl_certificate            $cert_chain_file;
-    ssl_certificate_key        $cert_key_file;
+    ssl_certificate            $cert_fullchain_path;
+    ssl_certificate_key        $cert_privkey_path;
     ssl_session_cache          builtin:1000 shared:SSL:10m;
     ssl_protocols              TLSv1.2 TLSv1.3;
     ssl_ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS;
@@ -1127,11 +1170,11 @@ Let's adjust access rights: By default, **Nginx** runs as user `nginx`
 
 ```shell
 eval $(openssl version -d|sed 's/: /=/')
-cert_chain_file=$OPENSSLDIR/certs/$aspera_fqdn.fullchain.pem
-cert_key_file=$OPENSSLDIR/private/$aspera_fqdn.key.pem
-chmod 644 $cert_chain_file
-chmod 600 $cert_key_file
-chown nginx: $cert_key_file
+cert_fullchain_path=$OPENSSLDIR/certs/$aspera_fqdn.fullchain.pem
+cert_privkey_path=$OPENSSLDIR/private/$aspera_fqdn.key.pem
+chmod 644 $cert_fullchain_path
+chmod 600 $cert_fullchain_path
+chown nginx: $cert_fullchain_path
 ```
 
 > [!NOTE]
@@ -1144,8 +1187,8 @@ Refer to the [Nginx documentation](https://nginx.org/en/docs/http/configuring_ht
 Modify `/etc/nginx/nginx.conf`, and change parameters: `ssl_certificate` and `ssl_certificate_key` with above paths.
 
 ```shell
-sed -i.bak -E -e "s|(ssl_certificate\s+).*;|\1$cert_chain_file;|" /etc/nginx/nginx.conf
-sed -i.bak -E -e "s|(ssl_certificate_key\s+).*;|\1$cert_key_file;|" /etc/nginx/nginx.conf
+sed -i.bak -E -e "s|(ssl_certificate\s+).*;|\1$cert_fullchain_path;|" /etc/nginx/nginx.conf
+sed -i.bak -E -e "s|(ssl_certificate_key\s+).*;|\1$cert_fullchain_path;|" /etc/nginx/nginx.conf
 ```
 
 ```shell
