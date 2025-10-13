@@ -666,11 +666,22 @@ set|grep ^cert_
 
 > [!NOTE]
 > macOS only.
+> [Documentation](https://www.ibm.com/docs/en/ahts/4.4.x?topic=suhna-installing-ssl-certificates-1)
 
 If `asperanoded` is used directly without `nginx`, then a certificate shall be installed:
 
 ```shell
-sudo asconfigurator -x "set_server_data;key_file,$cert_privkey_path;cert_file,$cert_only_path;chain_file,$cert_intermediate_path"
+cert_real_base=$aspera_hsts_folder/etc/real_cert
+cert_real_key=$cert_real_base.key
+cert_real_cert=$cert_real_base.full
+cert_real_chain=$cert_real_base.chain
+sudo cp $cert_privkey_path $cert_real_key
+sudo cp $cert_only_path $cert_real_cert
+sudo cp $cert_intermediate_path $cert_real_chain
+sudo chown asperadaemon: $cert_real_base*
+sudo asconfigurator -x "set_server_data;key_file,$cert_real_key;cert_file,$cert_real_cert;chain_file,$cert_real_chain"
+sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
+sudo launchctl load /Library/LaunchDaemons/com.aspera.asperanoded.plist
 ```
 
 To add user to group `aspadmins`:
@@ -685,6 +696,12 @@ To change a folder to group aspadmins:
 chgrp aspadmins .
 chgrp -R aspadmins .acme.sh
 chmod g+r $cert_privkey_path
+```
+
+To check content of cert bundle:
+
+```shell
+cat bundle.cer | awk '/BEGIN CERTIFICATE/{buf=$0 ORS;next}/END CERTIFICATE/{buf=buf $0 ORS;print buf | "openssl x509 -noout -subject";close("openssl x509 -noout -subject");buf="";next}{buf=buf $0 ORS}' | sed -n 's/.*CN=\(.*\)/\1/p'
 ```
 
 ### Nginx
@@ -741,6 +758,7 @@ nginx_etc=/etc/nginx
 brew install nginx
 nginx_log='# '
 nginx_etc=/opt/homebrew/etc/nginx
+nginx_log_dir=/opt/homebrew/var/log/nginx
 ```
 
 #### Configure **Nginx**
@@ -779,8 +797,6 @@ http {
     # HSTS: node API
     location / {
       proxy_pass               $aspera_node_local_url;
-      proxy_hide_header        Access-Control-Allow-Origin;
-      add_header               Access-Control-Allow-Origin *;
       $nginx_log node.access.log;
     }
     # HTTP Gateway
