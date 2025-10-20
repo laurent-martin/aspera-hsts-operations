@@ -1,5 +1,8 @@
 # IBM Aspera HSTS as tethered node in AoC
 
+<!-- https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts -->
+<!-- NOTE TIP IMPORTANT WARNING CAUTION -->
+
 ## Introduction
 
 The procedure is documented in the **Aspera on Cloud** manual:
@@ -219,7 +222,7 @@ source ./aspera_vars.sh
 #### General configuration: Linux
 
 > [!NOTE]
-> Linux only.
+> **Linux** only.
 
 Once the DNS name is known:
 
@@ -277,25 +280,32 @@ sudo sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
 > [!TIP]
 > One can check again with `sestatus`
 
-#### General configuration: macOS
+#### General configuration: **macOS**
 
 > [!NOTE]
-> macOS only.
+> **macOS** only.
 
-Check macOs version:
+Check **macOS** version:
 
 ```shell
 sw_vers
 ```
 
-Let's add sudo for the current user:
+Let's add `sudo` for the current user:
 
 ```shell
-echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USER-nopasswd > /dev/null
-sudo chmod 440 /etc/sudoers.d/$USER-nopasswd
+sudofile=/etc/sudoers.d/$USER-nopasswd
+echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee $sudofile > /dev/null
+sudo chmod 440 $sudofile
 ```
 
-Let's install [brew](https://brew.sh/):
+Check if `brew` is installed:
+
+```shell
+brew -v
+```
+
+If not, let's install [brew](https://brew.sh/):
 
 ```shell
 NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -305,7 +315,7 @@ NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ho
 
 > [!NOTE]
 > Installing the Aspera CLI is not mandatory, but it can be convenient.
-> It can be installed locally or on a remote system (e.g., Windows, macOS, etc.).
+> It can be installed locally or on a remote system (e.g., Windows, **macOS**, etc.).
 
 User Manual: <https://github.com/IBM/aspera-cli>
 
@@ -324,7 +334,7 @@ dnf install -y ruby-devel
 gem install aspera-cli -v 4.24.1
 ```
 
-#### Aspera CLI: macOS
+#### Aspera CLI: **macOS**
 
 Install ruby:
 
@@ -350,7 +360,7 @@ dnf install -y $aspera_install_package
 > [!NOTE]
 > `perl` is still required by the HSTS installer and also later by **Nginx**.
 
-#### Aspera Server: macOS
+#### Aspera Server: **macOS**
 
 ```shell
 name=${aspera_install_package%%-*}
@@ -370,10 +380,10 @@ sudo chmod a+r $aspera_hsts_folder/etc/aspera-license
 ascp -A
 ```
 
-### Declare the Aspera shell
+### Declare the Aspera shell (`aspshell`)
 
 > [!NOTE]
-> Linux and macOS.
+> Linux and **macOS**.
 > Optional, good practice, removes some warnings.
 
 As Aspera uses SSH by default, a protection is provided with a secure shell: `aspshell`.
@@ -386,7 +396,7 @@ grep -qxF '/bin/aspshell' /etc/shells || echo '/bin/aspshell' | sudo tee -a /etc
 ### Aspera logs: Linux
 
 > [!NOTE]
-> Optional but it is convenient.
+> Optional, but it is convenient.
 > Aspera logs use syslog and facility `local2`.
 > By default, logs go to `/var/log/messages` with `rsyslog`.
 
@@ -428,9 +438,9 @@ passwd --lock $aspera_os_user
 chage --mindays 0 --maxdays 99999 --inactive -1 --expiredate -1 $aspera_os_user
 ```
 
-#### Transfer user: macOS
+#### Transfer user: **macOS**
 
-Create a user group: `asperausers` and user ``
+Create a user group: `asperausers` and user `xfer`
 
 ```shell
 aspera_group=asperausers
@@ -466,6 +476,30 @@ Let's create some main storage location that will be used by Aspera and make it 
 sudo mkdir -p $aspera_storage_root
 sudo chown $aspera_os_user: $aspera_storage_root
 ```
+
+### Transfer Server configuration file
+
+> [!NOTE]
+> Informational section.
+
+The Aspera Transfer Server contains configuration in two places:
+
+- Static Configuration: Located in XML file: `$aspera_hsts_folder/etc/aspera.conf`
+- Dynamic Information: In a Redis database
+
+Although the file `aspera.conf` can be edited, it is not recommended.
+Instead, use the following tools
+
+- `asconfigurator`: Can be used to modify or get the information from `aspera.conf`.
+- `asuserdata`: To display information from `aspera.conf` in a more human-readable way, as well to display available parameters.
+
+Typically:
+
+1. Dump available parameters with: `asuserdata -a`
+2. Show command for parameter with: `asuserdata -+ | grep <parameter>`
+3. Execute modification command: `asconfigurator -x "..."`
+
+Other user: show current and default value for a parameter with `option_mask`: `asconfigurator -x 'get_server_data;option_mask,ssl_ciphers'`
 
 ### Configure token encryption key
 
@@ -543,14 +577,16 @@ When parameters for `asperanoded` (Node API server) are modified, one shall rest
 > In case of installation, one can just restart the daemon for config reload.
 
 > [!NOTE]
-> Linux only:
+> **Linux** only.
+> Execute the following command:
 
 ```shell
 systemctl restart asperanoded
 ```
 
 > [!NOTE]
-> macOS only:
+> **macOS** only.
+> Execute the following command:
 
 ```shell
 sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
@@ -564,14 +600,14 @@ It is also possible to configure HTTPS for token-based authorization.
 As recommended by **IBM**, do not expose port 22, and prefer to use port `33001` for SSH connections for Aspera.
 One can either use a single SSH server (`sshd`) for both remote terminal and Aspera transfers, or use a separate SSH server for Aspera transfers.
 
-#### SSH Server configuration: Linux
+#### SSH Server configuration: **Linux**
 
 > [!NOTE]
-> Linux only.
+> **Linux** only.
 
 This is the simplest configuration, as one only needs to configure the SSH server to listen on port `33001` instead of `22`.
 
-Let's configure SSH to also listen on port 33001 only:
+Let's configure **SSH** to listen on port `33001` only:
 
 ```shell
 sed -i '/^#Port 22$/a Port 33001' /etc/ssh/sshd_config
@@ -584,19 +620,49 @@ systemctl restart sshd
 > [!TIP]
 > To keep both 33001 and 22, uncomment the line: `#Port 22`, then restart the SSH service.
 
-#### SSH Server configuration: macOs
+#### SSH Server configuration: **macOs**
 
 > [!NOTE]
-> macOS only
+> **macOS** only
+
+Change port on which `sshd` listens:
 
 ```shell
 sudo sed -i.bak -E 's/^(ssh[[:space:]]+)[0-9]+(\/tcp.*)/\133001\2/' /etc/services
 ```
 
+Activate `sshd`, graphically, or using the following:
+
 ```shell
 sudo systemsetup -setremotelogin on
 sudo lsof -iTCP:33001 -sTCP:LISTEN
 ```
+
+If using an attached storage, you will also need to allow full disk access for ssh, and specifically allow the Aspera `xfer` user and admin:
+
+Open **System settings** &rarr; **Sharing** &rarr; **Remote Session** (i)
+
+![Remote Session](images/macos-remote-session.png)
+
+- Activate "full disk access for users"
+- Add the Aspera `xfer` user. (and admin if needed)
+- Deactivate and Re-Activate Remote Session
+
+In addition, if an external disk is used, one has to grant access to it to the `asperanoded` process:
+
+Open **System settings** &rarr; **Confidentiality and Security** &rarr; **Full Disk Access**, and add `asperanoded` like this:
+
+- Click on **+** (plus)
+- Navigate to **Mocintosh HD**
+- Press on keyboard: **command** and `.`. If `.` is on `<Shift>`, also press `<Shift>`.
+- This reveals hidden files.
+- Navigate to `/Library/Aspera/sbin`
+- Select `asperanoded`
+- Make sure it is activated as below:
+
+![Full disk access for asperanoded](images/macos-disk-access.png)
+
+See [Appendix: Access to storage](#access-to-storage-on-macos)
 
 ### Certificate for HTTPS
 
@@ -608,10 +674,10 @@ cert_fullchain_path=$cert_folder/_full_chain_file_
 cert_fullchain_path=$cert_folder/_key_file_
 ```
 
-#### Using let's encrypt and certbot: Linux
+#### Using **let's encrypt** and `certbot`: Linux
 
 > [!NOTE]
-> Linux only.
+> **Linux** only.
 
 A TLS certificate is required for above FQDN.
 
@@ -642,7 +708,7 @@ cert_privkey_path=$cert_folder/privkey.pem
 > Certificate and key is placed here: `/etc/letsencrypt/live/$aspera_fqdn/`.
 > See [Let's encrypt documentation](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
 
-#### Using let's encrypt and acme.sh: macOS
+#### Using **let's encrypt** and `acme.sh`: **macOS**
 
 ```shell
 brew install acme.sh
@@ -665,7 +731,7 @@ set|grep ^cert_
 ### Not using Nginx
 
 > [!NOTE]
-> macOS only.
+> **macOS** only.
 > [Documentation](https://www.ibm.com/docs/en/ahts/4.4.x?topic=suhna-installing-ssl-certificates-1)
 
 If `asperanoded` is used directly without `nginx`, then a certificate shall be installed:
@@ -684,13 +750,13 @@ sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
 sudo launchctl load /Library/LaunchDaemons/com.aspera.asperanoded.plist
 ```
 
-To add user to group `aspadmins`:
+To add admin user to group `aspadmins`:
 
 ```shell
 sudo dseditgroup -o edit -a laurent -t user aspadmins
 ```
 
-To change a folder to group aspadmins:
+To change a folder to group `aspadmins`:
 
 ```shell
 chgrp aspadmins .
@@ -726,18 +792,20 @@ Since we will use **Nginx** as reverse proxy, we can make Node API listen locall
 sudo asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_node_local_port$aspera_node_local_secu"
 ```
 
-`s` is for HTTPS.
+Type `s` is for HTTPS.
 Restart is required to change listening address.
 
 > [!WARNING]
-> Linux only:
+> **Linux** only.
+> Execute the following command:
 
 ```shell
 systemctl restart asperanoded
 ```
 
 > [!WARNING]
-> macOS only:
+> **macOS** only.
+> Execute the following command:
 
 ```shell
 sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
@@ -752,7 +820,7 @@ nginx_log='access_log               /var/log/nginx/'
 nginx_etc=/etc/nginx
 ```
 
-#### Install **Nginx**: macOS
+#### Install **Nginx**: **macOS**
 
 ```shell
 brew install nginx
@@ -928,7 +996,7 @@ It reports file events (transfers, etc...).
 #### Special case: HSTE
 
 > [!NOTE]
-> Linux only.
+> **Linux** only.
 
 If the transfer server is an **HSTS**, skip this step.
 
@@ -967,6 +1035,9 @@ Its status can be shown with:
 systemctl status asperaejd
 ```
 
+> [!NOTE]
+> As it is not yet configured, it may be in failed state.
+
 #### Create a node registration token
 
 This token can be used a single time.
@@ -1000,9 +1071,9 @@ Use the token from previous step in: `registration_token` variable.
 This command creates the configuration file: `/opt/aspera/etc/aejd.conf` after calling back AoC API to register the node.
 
 ```shell
-sudo /opt/aspera/bin/asp-cloud-config tether --aoc-registration-token $registration_token --aoc-url https://api.ibmaspera.com
-sudo chmod 600 /opt/aspera/etc/aejd.json
-sudo chown asperadaemon: /opt/aspera/etc/aejd.json
+sudo $aspera_hsts_folder/bin/asp-cloud-config tether --aoc-registration-token $registration_token --aoc-url https://api.ibmaspera.com
+sudo chmod 600 $aspera_hsts_folder/etc/aejd.json
+sudo chown asperadaemon: $aspera_hsts_folder/etc/aejd.json
 ```
 
 > [!NOTE]
@@ -1013,21 +1084,21 @@ sudo chown asperadaemon: /opt/aspera/etc/aejd.json
 Restart Aspera services in that order to apply the configuration:
 
 ```shell
-systemctl restart asperaejd
-systemctl restart asperanoded
+sudo systemctl restart asperaejd
+sudo systemctl restart asperanoded
 ```
 
 ### Installation of HTTP Gateway
 
 > [!NOTE]
-> Linux only.
+> **Linux** only.
 
 The HTTP Gateway can be installed on the same server as the Aspera Transfer Server.
 
 #### Installation
 
 ```shell
-rpm -Uvh ibm-aspera-httpgateway-2.3.0.156-b3b9633.x86_64.rpm
+sudo rpm -Uvh ibm-aspera-httpgateway-2.3.0.156-b3b9633.x86_64.rpm
 ```
 
 #### Configuration
@@ -1348,3 +1419,52 @@ It is possible to spawn a totally separate SSH server for Aspera transfers.
 This allows to keep the default SSH server for remote access, and to use a separate SSH server for Aspera transfers with a different configuration (and port).
 
 > **TODO**
+
+### Access to storage on **macOS**
+
+macOS implements a special security mechanism: **TCC** (Transparency, Consent, and Control).
+
+This prevents unauthorized processes to access to external storage.
+
+The current settings can be displayed in a terminal with:
+
+```shell
+sudo sqlite3 -column -header "/Library/Application Support/com.apple.TCC/TCC.db" "SELECT client, client_type, auth_value, auth_reason FROM access WHERE service LIKE 'kTCCServiceSystemPolicy%' ORDER BY service, client;"
+```
+
+```text
+client                                                          client_type  auth_value  auth_reason
+--------------------------------------------------------------  -----------  ----------  -----------
+/Library/Aspera/sbin/asperanoded                                1            0           5          
+/Library/PrivilegedHelperTools/com.microsoft.autoupdate.helper  1            0           5          
+/usr/libexec/sshd-keygen-wrapper                                1            2           4          
+/usr/sbin/sshd                                                  1            2           4          
+```
+
+Where:
+
+| Column        | Description                                              |
+|-------------|----------------------------------------------------------|
+| `client`	    | L’identifiant du client (bundle ID ou chemin du binaire) |
+| `client_type`	| 0 = app bundle ID / 1 = chemin absolu                    |
+|	`auth_value`	| 0 = refusé, 1 = demande, 2 = autorisé                    |
+|	`auth_reason`	| Raison (généralement 4 ou 5 = utilisateur)               |
+
+To get text instead of numerical and show only allowed:
+
+```shell
+sudo sqlite3 -column -header "/Library/Application Support/com.apple.TCC/TCC.db" "SELECT client, CASE client_type WHEN 0 THEN 'Bundle ID' WHEN 1 THEN 'Path' ELSE 'Unknown' END AS client_type, CASE auth_value WHEN 0 THEN 'Denied' WHEN 1 THEN 'Ask' WHEN 2 THEN 'Allowed' ELSE 'Unknown' END AS auth_value, CASE auth_reason WHEN 4 THEN 'User Choice' WHEN 5 THEN 'System / MDM' ELSE 'Other' END AS auth_reason FROM access WHERE service LIKE 'kTCCServiceSystemPolicy%' AND auth_value = 2 ORDER BY service, client;"
+```
+
+To show only those required:
+
+```shell
+sudo sqlite3 -column -header "/Library/Application Support/com.apple.TCC/TCC.db" "SELECT client, CASE client_type WHEN 0 THEN 'Bundle ID' WHEN 1 THEN 'Path' ELSE 'Unknown' END AS client_type, CASE auth_value WHEN 0 THEN 'Denied' WHEN 1 THEN 'Ask' WHEN 2 THEN 'Allowed' ELSE 'Unknown' END AS auth_value, CASE auth_reason WHEN 4 THEN 'User Choice' WHEN 5 THEN 'System / MDM' ELSE 'Other' END AS auth_reason FROM access WHERE service LIKE 'kTCCServiceSystemPolicy%' AND client IN ('/Library/Aspera/sbin/asperanoded', '/usr/libexec/sshd-keygen-wrapper') ORDER BY service, client;"
+```
+
+```text
+client                            client_type  auth_value  auth_reason
+--------------------------------  -----------  ----------  -----------
+/Library/Aspera/sbin/asperanoded  Path         Allowed     User Choice
+/usr/libexec/sshd-keygen-wrapper  Path         Allowed     User Choice
+```
