@@ -503,7 +503,26 @@ ls: cannot access '...': Permission denied
 ```
 
 Then make sure that the `xfer` user can navigate to the folder.
-One way to do is to execute:
+
+For a quick fix, execute:
+
+```shell
+IFS=/ read -ra P <<< "$(sudo realpath -m "$aspera_storage_root")"
+C=/
+for D in "${P[@]}"; do
+    C="$C$D"
+    if ! sudo test -d "$C"; then
+        echo "Error: directory does not exist: $C"
+        break
+    fi
+    if ! sudo -u "$aspera_os_user" test -x "$C"; then
+        sudo setfacl -m u:$aspera_os_user:x "$C"
+    fi
+    C="$C/"
+done
+```
+
+One way to do manually is to execute:
 
 ```shell
 sudo -u xfer xfer
@@ -522,7 +541,13 @@ Then fix the situation.
 For a PoC (not production) one can do:
 
 ```shell
-sudo chmod a+rx restricted_folder
+sudo chmod a+x restricted_folder
+```
+
+Or using ACL:
+
+```shell
+sudo setfacl -m u:$aspera_os_user:x restricted_folder
 ```
 
 ### Transfer Server configuration file
