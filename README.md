@@ -478,11 +478,51 @@ sudo dseditgroup -o edit -a xfer -t user com.apple.access_ssh
 
 ### Define storage location root
 
-Let's create some main storage location that will be used by Aspera and make it accessible by the transfer user:
+The storage root defined in `$aspera_storage_root` shall meet those requirements:
+
+- The `xfer` user shall be able to navigate from / to that folder, i.e. any intermediary folder shall have `rx` rights for that user.
+- The storage root shall be writable by the `xfer` user.
+
+For a PoC, if using the local disk, and if the destination folder does not exist yet, create some main storage location that will be used by Aspera and make it accessible by the transfer user (`xfer`):
 
 ```shell
 sudo mkdir -p $aspera_storage_root
 sudo chown $aspera_os_user: $aspera_storage_root
+```
+
+Check that it is accessible for the `xfer` user:
+
+```shell
+sudo -u xfer ls -ald $aspera_storage_root
+```
+
+If an error is displayed such as:
+
+```text
+ls: cannot access '...': Permission denied
+```
+
+Then make sure that the `xfer` user can navigate to the folder.
+One way to do is to execute:
+
+```shell
+sudo -u xfer xfer
+```
+
+And then to progress gradually through the folder hierachy with `cd`:
+
+```console
+$ cd /
+$ cd home
+$ cd restricted_folder
+cd: permission denied: restricted_folder
+```
+
+Then fix the situation.
+For a PoC (not production) one can do:
+
+```shell
+sudo chmod a+rx restricted_folder
 ```
 
 ### Transfer Server configuration file
