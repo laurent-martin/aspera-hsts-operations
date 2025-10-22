@@ -509,7 +509,7 @@ It needs to be provisioned, either as a static key in `aspera.conf` or as a dyna
 It is easier to use a static token encryption key:
 
 ```shell
-sudo asconfigurator -x "set_node_data;token_dynamic_key,false;token_encryption_key,$(LANG=C tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)"
+sudo $aspera_hsts_folder/bin/asconfigurator -x "set_node_data;token_dynamic_key,false;token_encryption_key,$(LANG=C tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)"
 ```
 
 Use of dynamic key is described in the [appendix](#dynamic-token-encryption-key).
@@ -531,15 +531,15 @@ sudo chown -R $aspera_os_user: $aspera_home
 **Aspera on Cloud** requires activity logging:
 
 ```shell
-sudo asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,true;activity_file_event_logging,true;activity_bandwidth_logging,true;files_recursive_counts_workers,5'
-sudo asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true;partial_file_suffix,.inprogress'
+sudo $aspera_hsts_folder/bin/asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,true;activity_file_event_logging,true;activity_bandwidth_logging,true;files_recursive_counts_workers,5'
+sudo $aspera_hsts_folder/bin/asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true;partial_file_suffix,.inprogress'
 ```
 
 By default, the HSTS uses caching for folder contents.
 To deactivate folder content caching, execute (Optional, Default: 5m):
 
 ```shell
-sudo asconfigurator -x 'set_server_data;files_cache_ttl,0'
+sudo $aspera_hsts_folder/bin/asconfigurator -x 'set_server_data;files_cache_ttl,0'
 ```
 
 Folder caching is useful when reading folder content is slow, due to slow storage or large number of files in folders.
@@ -549,7 +549,7 @@ Folder caching is useful when reading folder content is slow, due to slow storag
 To access the HSTS API and create an access key, we first need to provision an API user.
 
 ```shell
-sudo asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
+sudo $aspera_hsts_folder/bin/asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
 ```
 
 Access keys created with this API user will enable transfers that run on the host under the operating system user `$aspera_os_user`.
@@ -561,13 +561,13 @@ For more details, refer to the [Appendix](#transfer-user-file-restrictions).
 The simplest approach is to define a loose restriction:
 
 ```shell
-sudo asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
+sudo $aspera_hsts_folder/bin/asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
 ```
 
 Use of a token is mandatory, so it must be enabled and enforced for the transfer user.
 
 ```shell
-sudo asconfigurator -x "set_user_data;user_name,$aspera_os_user;authorization_transfer_in_value,token;authorization_transfer_out_value,token"
+sudo $aspera_hsts_folder/bin/asconfigurator -x "set_user_data;user_name,$aspera_os_user;authorization_transfer_in_value,token;authorization_transfer_out_value,token"
 ```
 
 When parameters for `asperanoded` (Node API server) are modified, one shall restart the daemon to reload the configuration:
@@ -745,7 +745,7 @@ sudo cp $cert_privkey_path $cert_real_key
 sudo cp $cert_only_path $cert_real_cert
 sudo cp $cert_intermediate_path $cert_real_chain
 sudo chown asperadaemon: $cert_real_base*
-sudo asconfigurator -x "set_server_data;key_file,$cert_real_key;cert_file,$cert_real_cert;chain_file,$cert_real_chain"
+sudo $aspera_hsts_folder/bin/asconfigurator -x "set_server_data;key_file,$cert_real_key;cert_file,$cert_real_cert;chain_file,$cert_real_chain"
 sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
 sudo launchctl load /Library/LaunchDaemons/com.aspera.asperanoded.plist
 ```
@@ -789,7 +789,7 @@ It :
 Since we will use **Nginx** as reverse proxy, we can make Node API listen locally only:
 
 ```shell
-sudo asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_node_local_port$aspera_node_local_secu"
+sudo $aspera_hsts_folder/bin/asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_node_local_port$aspera_node_local_secu"
 ```
 
 Type `s` is for HTTPS.
@@ -1041,12 +1041,12 @@ systemctl status asperaejd
 #### Create a node registration token
 
 This token can be used a single time.
-It can be created using the AoC web UI, or using `ascli` (requires to have configured access to AoC through `ascli`, see previous section):
+It can be created using the AoC web UI, or using `ascli` (requires having configured access to AoC through `ascli`, see previous section):
 
 This command saves the generated token in shell variable: `$registration_token`
 
 ```shell
-registration_token=$(ascli aoc admin client_registration_token create @json:'{"data":{"name":"laurentnode","client_subject_scopes":["aejd"],"client_subject_enabled":true}}' --fields=token --show-secrets=yes)
+registration_token=$(ascli aoc admin client_registration_token create @json:'{"data":{"name":"'"$aspera_fqdn"'","client_subject_scopes":["aejd"],"client_subject_enabled":true}}' --fields=token --show-secrets=yes)
 ```
 
 To display the value:
@@ -1064,7 +1064,7 @@ Execute as `root` (Still assuming that `$aspera_hsts_folder/bin/` is in the `PAT
 This command activate reporting of events from Node Daemon to the AEJ Daemon, once Node Daemon is restarted.
 
 ```shell
-sudo asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_local_addr"
+sudo $aspera_hsts_folder/bin/asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_local_addr"
 ```
 
 Use the token from previous step in: `registration_token` variable.
@@ -1345,7 +1345,7 @@ askmscli --init-keystore --user=$aspera_os_user
 - Finally, enable dynamic token encryption key:
 
 ```shell
-sudo asconfigurator -x 'set_node_data;token_dynamic_key,true;token_encryption_key,AS_NULL'
+sudo $aspera_hsts_folder/bin/asconfigurator -x 'set_node_data;token_dynamic_key,true;token_encryption_key,AS_NULL'
 ```
 
 ### Transfer user file restrictions
@@ -1379,7 +1379,7 @@ Typically, `|` is used.
 If we want to restrict creation of access keys to only folders under the selected storage location: `$aspera_storage_root`, then one can do:
 
 ```shell
-sudo asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
+sudo $aspera_hsts_folder/bin/asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
 ```
 
 Internally, in HSTS, storage locations are stored as a URI:
@@ -1406,7 +1406,7 @@ To allow access to **any path** under two locations, `/data/mnt1` and an S3 buck
 The corresponding command would be:
 
 ```shell
-sudo asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:////data/mnt1/*|s3://mys3/bucket/*"
+sudo $aspera_hsts_folder/bin/asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:////data/mnt1/*|s3://mys3/bucket/*"
 ```
 
 > [!NOTE]
