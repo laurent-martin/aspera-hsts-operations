@@ -860,7 +860,7 @@ http {
     ssl_protocols              TLSv1.2 TLSv1.3;
     ssl_ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS;
     ssl_prefer_server_ciphers  on;
-    $nginx_log global.access.log;
+    ${nginx_log}global.access.log;
     server_tokens              off;
     proxy_set_header           Host              \$host;
     proxy_set_header           X-Real-IP         \$remote_addr;
@@ -873,12 +873,12 @@ http {
     # HSTS: node API
     location / {
       proxy_pass               $aspera_node_local_url;
-      $nginx_log node.access.log;
+      ${nginx_log}node.access.log;
     }
     # HTTP Gateway
     location /aspera/http-gwy {
       proxy_pass               https://127.0.0.1:$aspera_htgw_local_port;
-      $nginx_log httpgw.access.log;
+      ${nginx_log}httpgw.access.log;
       proxy_http_version       1.1;
       proxy_set_header         Upgrade \$http_upgrade;
       proxy_set_header         Connection "Upgrade";
