@@ -139,6 +139,7 @@ We assume here that a compatible Virtual (or physical) Machine is installed with
 
 > [!IMPORTANT]
 > The following commands are executed as a normal user with `sudo` access for `root`.
+> It is also possible to impersonate `root` with `sudo -i`, and then execute commands without `sudo`.
 
 > [!NOTE]
 > We need to generate some secrets of a minimum given length.
@@ -196,10 +197,16 @@ aspera_https_local_port=443
 aspera_https_ext_port=443
 aspera_node_ext_url=https://$aspera_fqdn:$aspera_https_ext_port
 aspera_htgw_local_port=7443
-PATH=$aspera_hsts_folder/bin:/usr/local/bin:$PATH
+alias asnodeadmin="sudo $aspera_hsts_folder/bin/asnodeadmin"
+alias asconfigurator="sudo $aspera_hsts_folder/bin/asconfigurator"
+alias asuserdata="$aspera_hsts_folder/bin/asuserdata"
 END_OF_CONFIG
 echo aspera_node_pass=$(LANG=C tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40) >> ./aspera_vars.sh
 ```
+
+> [!NOTE]
+> If you prefer to execute all commands as root, then remove the `alias` lines and add this line:
+> `export PATH=$PATH:$aspera_hsts_folder/bin`
 
 Once created, edit the generated file `./aspera_vars.sh` and customize with your own values.
 
@@ -227,8 +234,9 @@ source ./aspera_vars.sh
 Once the DNS name is known:
 
 ```shell
-echo $aspera_fqdn > /etc/hostname
-hostname $aspera_fqdn
+echo $aspera_fqdn | sudo tee /etc/hostname > /dev/null
+sudo hostname $aspera_fqdn
+echo "127.0.0.1 $aspera_fqdn" | sudo tee -a /etc/hosts > /dev/null
 hostname
 ```
 
@@ -328,10 +336,10 @@ ascli -v
 #### Aspera CLI: Linux
 
 ```shell
-dnf module -y reset ruby
-dnf module -y enable ruby:3.3
-dnf install -y ruby-devel
-gem install aspera-cli -v 4.24.1
+sudo dnf module -y reset ruby
+sudo dnf module -y enable ruby:3.3
+sudo dnf install -y ruby-devel
+sudo gem install aspera-cli -v 4.24.1
 ```
 
 #### Aspera CLI: **macOS**
@@ -354,7 +362,7 @@ gem install aspera-cli -v 4.24.1
 #### Aspera Server: Linux
 
 ```shell
-dnf install -y $aspera_install_package
+sudo dnf install -y $aspera_install_package
 ```
 
 > [!NOTE]
@@ -432,10 +440,10 @@ We make sure to block password-based login with that user and ensure it never ex
 #### Transfer user: Linux
 
 ```shell
-groupadd asperausers
-useradd --create-home --no-user-group --gid asperausers --shell /bin/aspshell $aspera_os_user
-passwd --lock $aspera_os_user
-chage --mindays 0 --maxdays 99999 --inactive -1 --expiredate -1 $aspera_os_user
+sudo groupadd asperausers
+sudo useradd --create-home --no-user-group --gid asperausers --shell /bin/aspshell $aspera_os_user
+sudo passwd --lock $aspera_os_user
+sudo chage --mindays 0 --maxdays 99999 --inactive -1 --expiredate -1 $aspera_os_user
 ```
 
 #### Transfer user: **macOS**
@@ -509,7 +517,7 @@ It needs to be provisioned, either as a static key in `aspera.conf` or as a dyna
 It is easier to use a static token encryption key:
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x "set_node_data;token_dynamic_key,false;token_encryption_key,$(LANG=C tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)"
+asconfigurator -x "set_node_data;token_dynamic_key,false;token_encryption_key,$(LANG=C tr -dc 'A-Za-z0-9'</dev/urandom|head -c 40)"
 ```
 
 Use of dynamic key is described in the [appendix](#dynamic-token-encryption-key).
@@ -531,15 +539,15 @@ sudo chown -R $aspera_os_user: $aspera_home
 **Aspera on Cloud** requires activity logging:
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x 'set_server_data;activity_logging,true;activity_event_logging,true;activity_file_event_logging,true;activity_bandwidth_logging,true;files_recursive_counts_workers,5'
-sudo $aspera_hsts_folder/bin/asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true;partial_file_suffix,.inprogress'
+asconfigurator -x "set_server_data;server_name,$aspera_fqdn;activity_logging,true;activity_event_logging,true;activity_file_event_logging,true;activity_bandwidth_logging,true;files_recursive_counts_workers,5"
+asconfigurator -x 'set_node_data;pre_calculate_job_size,yes;async_activity_logging,true;partial_file_suffix,.inprogress'
 ```
 
 By default, the HSTS uses caching for folder contents.
 To deactivate folder content caching, execute (Optional, Default: 5m):
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x 'set_server_data;files_cache_ttl,0'
+asconfigurator -x 'set_server_data;files_cache_ttl,0'
 ```
 
 Folder caching is useful when reading folder content is slow, due to slow storage or large number of files in folders.
@@ -549,7 +557,7 @@ Folder caching is useful when reading folder content is slow, due to slow storag
 To access the HSTS API and create an access key, we first need to provision an API user.
 
 ```shell
-sudo $aspera_hsts_folder/bin/asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
+asnodeadmin -a -u $aspera_node_user -p $aspera_node_pass -x $aspera_os_user
 ```
 
 Access keys created with this API user will enable transfers that run on the host under the operating system user `$aspera_os_user`.
@@ -561,13 +569,13 @@ For more details, refer to the [Appendix](#transfer-user-file-restrictions).
 The simplest approach is to define a loose restriction:
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|*"
 ```
 
 Use of a token is mandatory, so it must be enabled and enforced for the transfer user.
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x "set_user_data;user_name,$aspera_os_user;authorization_transfer_in_value,token;authorization_transfer_out_value,token"
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;authorization_transfer_in_value,token;authorization_transfer_out_value,token"
 ```
 
 When parameters for `asperanoded` (Node API server) are modified, one shall restart the daemon to reload the configuration:
@@ -581,7 +589,7 @@ When parameters for `asperanoded` (Node API server) are modified, one shall rest
 > Execute the following command:
 
 ```shell
-systemctl restart asperanoded
+sudo systemctl restart asperanoded
 ```
 
 > [!NOTE]
@@ -610,15 +618,15 @@ This is the simplest configuration, as one only needs to configure the SSH serve
 Let's configure **SSH** to listen on port `33001` only:
 
 ```shell
-sed -i '/^#Port 22$/a Port 33001' /etc/ssh/sshd_config
-sed -i '/^#UseDNS yes$/a UseDNS no' /etc/ssh/sshd_config
-sed -i '/^HostKey .*ecdsa_key$/s/^/#/ ' /etc/ssh/sshd_config
-sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
-systemctl restart sshd
+sudo sed -i '/^#Port 22$/a Port 33001' /etc/ssh/sshd_config
+sudo sed -i '/^#UseDNS yes$/a UseDNS no' /etc/ssh/sshd_config
+sudo sed -i '/^HostKey .*ecdsa_key$/s/^/#/ ' /etc/ssh/sshd_config
+sudo sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
+sudo systemctl restart sshd
 ```
 
 > [!TIP]
-> To keep both 33001 and 22, uncomment the line: `#Port 22`, then restart the SSH service.
+> To keep both `33001` and `22`, uncomment the line: `#Port 22`, then restart the SSH service.
 
 #### SSH Server configuration: **macOs**
 
@@ -686,17 +694,17 @@ If you don't have one, then it is possible to generate one with below procedure 
 Install `certbot`:
 
 ```shell
-dnf install -y python3.12
-python3 -m venv /opt/certbot/
-/opt/certbot/bin/pip install --upgrade pip
-/opt/certbot/bin/pip install certbot
+sudo dnf install -y python3.12
+sudo python3 -m venv /opt/certbot/
+sudo /opt/certbot/bin/pip install --upgrade pip
+sudo /opt/certbot/bin/pip install certbot
 ln -s /opt/certbot/bin/certbot /usr/bin/certbot
 ```
 
 Generate a certificate:
 
 ```shell
-certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --standalone
+sudo certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --standalone
 cert_folder=/etc/letsencrypt/live/$aspera_fqdn
 cert_fullchain_path=$cert_folder/fullchain.pem
 cert_only_path=$cert_folder/
@@ -745,7 +753,7 @@ sudo cp $cert_privkey_path $cert_real_key
 sudo cp $cert_only_path $cert_real_cert
 sudo cp $cert_intermediate_path $cert_real_chain
 sudo chown asperadaemon: $cert_real_base*
-sudo $aspera_hsts_folder/bin/asconfigurator -x "set_server_data;key_file,$cert_real_key;cert_file,$cert_real_cert;chain_file,$cert_real_chain"
+asconfigurator -x "set_server_data;key_file,$cert_real_key;cert_file,$cert_real_cert;chain_file,$cert_real_chain"
 sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
 sudo launchctl load /Library/LaunchDaemons/com.aspera.asperanoded.plist
 ```
@@ -759,9 +767,9 @@ sudo dseditgroup -o edit -a laurent -t user aspadmins
 To change a folder to group `aspadmins`:
 
 ```shell
-chgrp aspadmins .
-chgrp -R aspadmins .acme.sh
-chmod g+r $cert_privkey_path
+sudo chgrp aspadmins .
+sudo chgrp -R aspadmins .acme.sh
+sudo chmod g+r $cert_privkey_path
 ```
 
 To check content of cert bundle:
@@ -789,7 +797,7 @@ It :
 Since we will use **Nginx** as reverse proxy, we can make Node API listen locally only:
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_node_local_port$aspera_node_local_secu"
+asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_node_local_port$aspera_node_local_secu"
 ```
 
 Type `s` is for HTTPS.
@@ -800,7 +808,7 @@ Restart is required to change listening address.
 > Execute the following command:
 
 ```shell
-systemctl restart asperanoded
+sudo systemctl restart asperanoded
 ```
 
 > [!WARNING]
@@ -815,7 +823,7 @@ sudo launchctl load /Library/LaunchDaemons/com.aspera.asperanoded.plist
 #### Install **Nginx**: Linux
 
 ```shell
-dnf install -y nginx
+sudo dnf install -y nginx
 nginx_log='access_log               /var/log/nginx/'
 nginx_etc=/etc/nginx
 ```
@@ -1064,7 +1072,7 @@ Execute as `root` (Still assuming that `$aspera_hsts_folder/bin/` is in the `PAT
 This command activate reporting of events from Node Daemon to the AEJ Daemon, once Node Daemon is restarted.
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_local_addr"
+asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_local_addr"
 ```
 
 Use the token from previous step in: `registration_token` variable.
@@ -1106,12 +1114,12 @@ sudo rpm -Uvh ibm-aspera-httpgateway-2.3.0.156-b3b9633.x86_64.rpm
 Make **HTTP Gateway** listen locally on high port.
 
 ```shell
-cp /opt/aspera/httpgateway/config/{default,gatewayconfig}.properties
-sed --in-place --regexp-extended \
+sudo cp /opt/aspera/httpgateway/config/{default,gatewayconfig}.properties
+sudo sed --in-place --regexp-extended \
 --expression='s/^(serverconfig\.host)=.*/\1=127.0.0.1/' \
 --expression="s/^(serverconfig\.port)=.*/\1=$aspera_htgw_local_port/" \
 /opt/aspera/httpgateway/config/gatewayconfig.properties
-systemctl restart aspera_httpgateway
+sudo systemctl restart aspera_httpgateway
 ```
 
 Auto restart on failure:
@@ -1120,14 +1128,14 @@ Auto restart on failure:
 service_file=/usr/lib/systemd/system/aspera_httpgateway.service
 if ! grep -q '^Restart=' $service_file;then
   tmpfile=$(mktemp)
-  cat > "$tmpfile" << EOF
+  sudo tee "$tmpfile" > /dev/null << EOF
 Restart=on-failure
 RestartSec=30s
 EOF
-  sed -i -Ee '/^\[Service\]/r '"$tmpfile"'' $service_file
-  rm -f "$tmpfile"
-  systemctl daemon-reload
-  systemctl restart aspera_httpgateway
+  sudo sed -i -Ee '/^\[Service\]/r '"$tmpfile"'' $service_file
+  sudo rm -f "$tmpfile"
+  sudo systemctl daemon-reload
+  sudo systemctl restart aspera_httpgateway
 fi
 ```
 
@@ -1195,8 +1203,8 @@ set|grep ^aspera_
 #### Updating local hostname
 
 ```shell
-echo $aspera_fqdn > /etc/hostname
-hostname $aspera_fqdn
+echo $aspera_fqdn | sudo tee /etc/hostname > /dev/null
+sudo hostname $aspera_fqdn
 ```
 
 Check with:
@@ -1345,7 +1353,7 @@ askmscli --init-keystore --user=$aspera_os_user
 - Finally, enable dynamic token encryption key:
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x 'set_node_data;token_dynamic_key,true;token_encryption_key,AS_NULL'
+asconfigurator -x 'set_node_data;token_dynamic_key,true;token_encryption_key,AS_NULL'
 ```
 
 ### Transfer user file restrictions
@@ -1379,7 +1387,7 @@ Typically, `|` is used.
 If we want to restrict creation of access keys to only folders under the selected storage location: `$aspera_storage_root`, then one can do:
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:///$aspera_storage_root/*"
 ```
 
 Internally, in HSTS, storage locations are stored as a URI:
@@ -1406,7 +1414,7 @@ To allow access to **any path** under two locations, `/data/mnt1` and an S3 buck
 The corresponding command would be:
 
 ```shell
-sudo $aspera_hsts_folder/bin/asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:////data/mnt1/*|s3://mys3/bucket/*"
+asconfigurator -x "set_user_data;user_name,$aspera_os_user;absolute,AS_NULL;file_restriction,|file:////data/mnt1/*|s3://mys3/bucket/*"
 ```
 
 > [!NOTE]
