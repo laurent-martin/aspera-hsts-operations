@@ -423,7 +423,7 @@ sudo tee /etc/logrotate.d/aspera > /dev/null << 'EOF'
   endscript
 }
 EOF
-for d in asperanoded asperaredisd asperacentral asperawatchd asperawatchfolderd asperarund asperahttpd http-gateway ascli async faspio-gateway;do
+for d in asperanoded asperaredisd asperacentral asperawatchd asperawatchfolderd asperarund asperahttpd aejd http-gateway ascli async faspio-gateway;do
   l=/var/log/${d}.log
   echo 'if $programname == '"'$d'"' then { action(type="omfile" file="'${l}'") stop }' | sudo tee /etc/rsyslog.d/00${d}_log.conf > /dev/null
   sudo sed -i -e '/aspera.log/ a '${l} /etc/logrotate.d/aspera
