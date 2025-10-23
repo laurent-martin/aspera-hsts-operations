@@ -1073,9 +1073,10 @@ It reports file events (transfers, etc...).
 
 If the transfer server is an **HSTS**, skip this step.
 
-If the node is an **Aspera Endpoint**, then create this file: `/opt/aspera/etc/systemd/asperaejd.service` with this content:
+If the node is an **Aspera Endpoint**, then create the start file using these commands:
 
-```ini
+```shell
+sudo tee /opt/aspera/etc/systemd/asperaejd.service > /dev/null << END_OF_FILE
 [Unit]
 Description=IBM Aspera Event Journal Daemon
 ConditionPathExists=/opt/aspera/sbin/aejd
@@ -1092,6 +1093,8 @@ TimeoutStopSec=20
 KillMode=process
 Restart=always
 RestartSec=10s
+END_OF_FILE
+sudo chown asperadaemon: /opt/aspera/etc/systemd/asperaejd.service
 ```
 
 Then activate **AEJD**.
