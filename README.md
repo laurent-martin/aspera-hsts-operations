@@ -1116,6 +1116,10 @@ systemctl status asperaejd
 
 #### Create a node registration token
 
+> [!NOTE]
+> To use `ascli` as below, you must have configured it following section:
+> [Accessing AoC using command line](#accessing-aoc-using-command-line)
+
 This token can be used a single time.
 It can be created using the AoC web UI, or using `ascli` (requires having configured access to AoC through `ascli`, see previous section):
 
