@@ -1560,23 +1560,47 @@ client                            client_type  auth_value  auth_reason
 
 ### Limiting bandwidth use (server side)
 
-Commercial perpetual licenses are capped to a given bandwidth, typically, 100 Mbps, 300 Mbps, 500 Mbps or 1 Gbps.
-Evaluation licenses are not capped.
-To cap an evaluation license, like a commercial one, e.g. for 300 Mbps, execute:
+Commercial **perpetual licenses** include a fixed bandwidth cap, typically 100 Mbps, 300 Mbps, 500 Mbps, or 1 Gbps.
+Evaluation licenses are **not capped by default**.
+
+To simulate a bandwidth cap for an evaluation license (for example, 300 Mbps), run the following command:
 
 ```shell
 sudo /opt/aspera/bin/asconfigurator -x 'set_node_data;transfer_in_bandwidth_flow_target_rate_cap,300000;transfer_in_bandwidth_flow_target_rate_cap,300000'
 ```
 
 > [!NOTE]
-> Above command limit individual transfer sessions, but not the global bandwidth use.
-> Speed is in **Kbps**.
-> For example, with a cap at 300 Mbps, two sessions with a target at 300 Mbps may use up to 600 Mbps in total.
+> The above command limits **each individual transfer session**, not the **total aggregate bandwidth**.
+> Speeds are expressed in **Kbps**.
+> For instance, with a 300 Mbps cap, two simultaneous sessions each capped at 300 Mbps could together use up to 600 Mbps in total.
 
-In addition, the license is for aggregate bandwidth, so the following configuration ensure that, globally, the sum of all bandwidth used does not exceed the license:
+Because the license applies to **aggregate bandwidth**, it is recommended to configure Virtual Links to ensure that the total bandwidth used across all transfers does not exceed the licensed limit:
 
 ```shell
 sudo /opt/aspera/bin/asconfigurator -x 'set_trunk_data;id,1;trunk_name,in;trunk_capacity,300000;trunk_on,true'
 sudo /opt/aspera/bin/asconfigurator -x 'set_trunk_data;id,2;trunk_name,out;trunk_capacity,300000;trunk_on,true'
 sudo /opt/aspera/bin/asconfigurator -x 'set_node_data;transfer_in_bandwidth_aggregate_trunk_id,1;transfer_out_bandwidth_aggregate_trunk_id,2'
 ```
+
+> [!WARNING]
+> If Virtual Links are **not configured**, multiple parallel transfers may exceed the licensed bandwidth and cause **network congestion** due to full link utilization.
+
+### Limiting bandwidth use (client side)
+
+See [Aspera for Desktop Manual](https://www.ibm.com/docs/en/aspera-for-desktop/1.0.x?topic=preferences-limit-bandwidth-usage#preferences-limit-bandwidth-usage__title__2).
+
+When using the web client **Aspera for Desktop**, end users can also set their own bandwidth limits.
+This can be done by navigating to:
+
+Settings &rarr; Transfers &rarr; Application bandwidth limits
+
+and specifying limits for both uploads and downloads.
+
+When a transfer is initiated, the server defines an initial **target rate**.
+However, the **client** can adjust this rate - either increase or decrease it - by opening the transfer’s three-dot menu in the Transfer Monitor, and selecting **View Speed**.
+
+![Speed menu](images/afd_speed_menu.png)
+
+and then adjust using the bottom slidebar.
+
+![Speed slide bar](images/afd_speed_slider.png)
