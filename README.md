@@ -25,13 +25,13 @@ This procedure is especially adapted to set up a self-managed **Aspera High-Spee
 ### Assumptions
 
 The VM where HSTS will run has a direct internet connection (no forward, no reverse proxy): it can reach internet, and can be reached from internet.
-If NAT is used for the Node API, then we assume here that the same port is used for external and internal, else both ports shall be listened by **Nginx** so that both external and internal users can reach it.
+If NAT is used for the Node API, then we assume here that the same port is used for external and internal, else both ports shall be listened by **nginx** so that both external and internal users can reach it.
 If proxies are used/needed, then additional configuration can be done, not covered here.
 
 > [!NOTE]
 > It is also possible to use HTTPS instead of SSH for the TCP connection for transfers.
 > In that case, a single HTTPS port may be shared between node and transfer.
-> That requires additional configuration in **Nginx**.
+> That requires additional configuration in **nginx**.
 
 ### Pre-requisites
 
@@ -152,25 +152,28 @@ We assume here that a compatible Virtual (or physical) Machine is installed with
 The next sections will use parameters that need to be defined.
 These parameters are described in the following table.
 
-| Parameter                | Description                                                   |
-|--------------------------|---------------------------------------------------------------|
-| `aspera_hsts_folder`     | The installation folder of HSTS.                              |
-| `aspera_storage_root`    | The top folder under which Aspera will transfer files.        |
-| `aspera_install_package` | Path to the HSTS RPM that you downloaded.<br/>e.g. `./ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm` |
-| `aspera_license_file`    | Path to the Aspera HSTS license file.<br/>e.g. `./87650-AsperaEnterprise-unlim.eval.aspera-license`    |
-| `aspera_cert_email`      | Place your email, this is used by `letsencrypt` to notify you when the certificate will expire. |
-| `aspera_fqdn`            | Place your server's DNS address.<br/>For example, I used IBM Techzone and FreeDNS: `itzvsi-f0pjbk8h.mojok.org` |
-| `aspera_os_user`         | Typically `xfer`.<br/>The operating system user under which transfers will be executed. |
-| `aspera_node_user`       | The main administrative API user who will create access keys. |
-| `aspera_node_pass`       | Password for the main node use.                               |
-| `aspera_node_local_addr` | Address where node can be contacted locally.                  |
-| `aspera_node_local_port` | The local port where `asperanoded` listens.                   |
-| `aspera_node_local_secu` | `s` for HTTPS, and empty for HTTP.<br/>It refers to the local port listened by `asperanoded`. |
-| `aspera_node_local_url`  | The URL for above parameters.                                 |
-| `aspera_https_local_port`| Local port where HTTPS is acceble from local network, i.e. port of proxy. |
-| `aspera_https_ext_port`  | The external port on which HTTPS will be reachable. Typically, `443`. |
-| `aspera_node_ext_url`    | The URL where Node API is accessible from internet.           |
-| `aspera_htgw_local_port` | Local port for httpgw, if configured.                         |
+| Parameter                 | Description                                                   |
+|---------------------------|---------------------------------------------------------------|
+| `aspera_hsts_folder`      | The installation folder of HSTS.                              |
+| `aspera_storage_root`     | The top folder under which Aspera will transfer files.        |
+| `aspera_install_package`  | Path to the HSTS RPM that you downloaded.<br/>e.g. `./ibm-aspera-hsts-4.4.5.1646-linux-64-release.rpm` |
+| `aspera_license_file`     | Path to the Aspera HSTS license file.<br/>e.g. `./87650-AsperaEnterprise-unlim.eval.aspera-license`    |
+| `aspera_cert_email`       | Place your email, this is used by `letsencrypt` to notify you when the certificate will expire. |
+| `aspera_fqdn`             | Place your server's DNS address.<br/>For example, I used IBM Techzone and FreeDNS: `itzvsi-f0pjbk8h.mojok.org` |
+| `aspera_os_user`          | Typically `xfer`.<br/>The operating system user under which transfers will be executed. |
+| `aspera_loopback_addr`    | `127.0.0.1` loopback address for local communication          |
+| `aspera_node_user`        | The main administrative API user who will create access keys. |
+| `aspera_node_pass`        | Password for the main node use.                               |
+| `aspera_node_listen_addr` | Address where node can be contacted locally.                  |
+| `aspera_node_listen_port` | The local port where `asperanoded` actually listens.          |
+| `aspera_node_listen_secu` | `s` for HTTPS, and empty for HTTP.<br/>It refers to the local port listened by `asperanoded`. |
+| `aspera_node_local_url`   | The URL for above parameters.                                 |
+| `aspera_https_local_port` | Local port where HTTPS is acceble from local network, i.e. port of proxy. |
+| `aspera_https_ext_port`   | The external port on which HTTPS will be reachable. Typically, `443`. |
+| `aspera_node_ext_url`     | The URL where Node API is accessible from internet.           |
+| `aspera_htgw_local_port`  | Local port for httpgw, if configured.                         |
+| `aspera_ssh_port`         | SSH port for Aspera.
+ |
 
 For convenience, let's create a shell configuration file named `./aspera_vars.sh` to store the parameters used.
 This assumes you are working within the aspera_installation folder located in the current user's home directory.
@@ -188,15 +191,17 @@ aspera_license_file=_path_to_license_file_
 aspera_cert_email=_your_email_here_
 aspera_fqdn=_your_server_fqdn_here_
 aspera_os_user=xfer
+aspera_loopback_addr=127.0.0.1
 aspera_node_user=node_admin
-aspera_node_local_addr=127.0.0.1
-aspera_node_local_port=9092
-aspera_node_local_secu=s
-aspera_node_local_url=http$aspera_node_local_secu://$aspera_node_local_addr:$aspera_node_local_port
+aspera_node_listen_addr=$aspera_loopback_addr
+aspera_node_listen_port=9092
+aspera_node_listen_secu=s
+aspera_node_local_url=http$aspera_node_listen_secu://$aspera_loopback_addr:$aspera_node_listen_port
 aspera_https_local_port=443
 aspera_https_ext_port=443
 aspera_node_ext_url=https://$aspera_fqdn:$aspera_https_ext_port
 aspera_htgw_local_port=7443
+aspera_ssh_port=33001
 alias asnodeadmin="sudo $aspera_hsts_folder/bin/asnodeadmin"
 alias asconfigurator="sudo $aspera_hsts_folder/bin/asconfigurator"
 alias asuserdata="$aspera_hsts_folder/bin/asuserdata"
@@ -366,7 +371,7 @@ sudo dnf install -y $aspera_install_package
 ```
 
 > [!NOTE]
-> `perl` is still required by the HSTS installer and also later by **Nginx**.
+> `perl` is still required by the HSTS installer and also later by **nginx**.
 
 #### Aspera Server: **macOS**
 
@@ -385,8 +390,10 @@ This file must be world-readable, or at least readable by `asperadaemons` and tr
 ```shell
 sudo cp $aspera_license_file $aspera_hsts_folder/etc/aspera-license
 sudo chmod a+r $aspera_hsts_folder/etc/aspera-license
-ascp -A
+sudo -u xfer ascp -A
 ```
+
+The last command shall display the elements of the installed license file.
 
 ### Declare the Aspera shell (`aspshell`)
 
@@ -423,7 +430,7 @@ sudo tee /etc/logrotate.d/aspera > /dev/null << 'EOF'
   endscript
 }
 EOF
-for d in asperanoded asperaredisd asperacentral asperawatchd asperawatchfolderd asperarund asperahttpd aejd http-gateway ascli async faspio-gateway;do
+for d in aejd asperacentral asperahttpd asperanoded asperaredisd asperarund asperawatchd asperawatchfolderd http-gateway ascli async faspio-gateway;do
   l=/var/log/${d}.log
   echo 'if $programname == '"'$d'"' then { action(type="omfile" file="'${l}'") stop }' | sudo tee /etc/rsyslog.d/00${d}_log.conf > /dev/null
   sudo sed -i -e '/aspera.log/ a '${l} /etc/logrotate.d/aspera
@@ -683,7 +690,7 @@ This is the simplest configuration, as one only needs to configure the SSH serve
 Let's configure **SSH** to listen on port `33001` only:
 
 ```shell
-sudo sed -i '/^#Port 22$/a Port 33001' /etc/ssh/sshd_config
+sudo sed -i "/^#Port 22$/a Port $aspera_ssh_port" /etc/ssh/sshd_config
 sudo sed -i '/^#UseDNS yes$/a UseDNS no' /etc/ssh/sshd_config
 sudo sed -i '/^HostKey .*ecdsa_key$/s/^/#/ ' /etc/ssh/sshd_config
 sudo sed -i '/^HostKey .*ed25519_key$/s/^/#/ ' /etc/ssh/sshd_config
@@ -708,7 +715,7 @@ Activate `sshd`, graphically, or using the following:
 
 ```shell
 sudo systemsetup -setremotelogin on
-sudo lsof -iTCP:33001 -sTCP:LISTEN
+sudo lsof -P -iTCP:$aspera_ssh_port -sTCP:LISTEN
 ```
 
 If using an attached storage, you will also need to allow full disk access for ssh, and specifically allow the Aspera `xfer` user and admin:
@@ -792,7 +799,7 @@ Generate certificate using [tls-alpn-01 challenge on port 443](https://letsencry
 ```shell
 acme.sh --set-default-ca --server letsencrypt
 acme.sh --register-account -m $aspera_cert_email
-acme.sh --issue --alpn --tlsport $aspera_https_local_port -d $aspera_fqdn
+acme.sh --issue --alpn --tlsport $aspera_https_local_port --keylength 4096 --domain $aspera_fqdn
 cert_folder=$(dirname $(acme.sh --info -d $aspera_fqdn|sed -n 's/^DOMAIN_CONF=//p'))
 cert_fullchain_path=$cert_folder/fullchain.cer
 cert_intermediate_path=$cert_folder/ca.cer
@@ -816,11 +823,13 @@ cert_real_cert=$cert_real_base.full
 cert_real_chain=$cert_real_base.chain
 sudo cp $cert_privkey_path $cert_real_key
 sudo cp $cert_only_path $cert_real_cert
-sudo cp $cert_intermediate_path $cert_real_chain
+sudo cp $cert_fullchain_path $cert_real_chain
 sudo chown asperadaemon: $cert_real_base*
-asconfigurator -x "set_server_data;key_file,$cert_real_key;cert_file,$cert_real_cert;chain_file,$cert_real_chain"
+asconfigurator -x "set_server_data;listen,AS_NULL;key_file,$cert_real_key;cert_file,$cert_real_cert;chain_file,$cert_real_chain"
 sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
 sudo launchctl load /Library/LaunchDaemons/com.aspera.asperanoded.plist
+sleep 5
+sudo lsof -P -iTCP:$aspera_node_listen_port -sTCP:LISTEN
 ```
 
 To add admin user to group `aspadmins`:
@@ -845,7 +854,7 @@ cat bundle.cer | awk '/BEGIN CERTIFICATE/{buf=$0 ORS;next}/END CERTIFICATE/{buf=
 
 ### Nginx
 
-Technically, **Nginx** is not required, but it is recommended when the Node API faces Internet, and it has several advantages.
+Technically, **nginx** is not required, but it is recommended when the Node API faces Internet, and it has several advantages.
 It :
 
 - allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port `443`,
@@ -859,10 +868,10 @@ It :
 > Do this part only if you want to front-end `asperanoded` with nginx
 > and possibly share the HTTPS port between multiple applications
 
-Since we will use **Nginx** as reverse proxy, we can make Node API listen locally only:
+Since we will use **nginx** as reverse proxy, we can make Node API listen locally only:
 
 ```shell
-asconfigurator -x "set_server_data;listen,$aspera_node_local_addr:$aspera_node_local_port$aspera_node_local_secu"
+asconfigurator -x "set_server_data;listen,$aspera_node_listen_addr:$aspera_node_listen_port$aspera_node_listen_secu"
 ```
 
 Type `s` is for HTTPS.
@@ -885,7 +894,7 @@ sudo launchctl unload /Library/LaunchDaemons/com.aspera.asperanoded.plist
 sudo launchctl load /Library/LaunchDaemons/com.aspera.asperanoded.plist
 ```
 
-#### Install **Nginx**: Linux
+#### Install **nginx**: Linux
 
 ```shell
 sudo dnf install -y nginx
@@ -893,7 +902,7 @@ nginx_log='access_log               /var/log/nginx/'
 nginx_etc=/etc/nginx
 ```
 
-#### Install **Nginx**: **macOS**
+#### Install **nginx**: **macOS**
 
 ```shell
 brew install nginx
@@ -902,9 +911,9 @@ nginx_etc=/opt/homebrew/etc/nginx
 nginx_log_dir=/opt/homebrew/var/log/nginx
 ```
 
-#### Configure **Nginx**
+#### Configure **nginx**
 
-Create a configuration file for **Nginx**:
+Create a configuration file for **nginx**:
 
 ```shell
 sudo tee $nginx_etc/nginx.conf > /dev/null << EOF
@@ -977,7 +986,7 @@ sudo brew services restart nginx
 > Ideally, below command shall be executed from outside the on-premise environment.
 > The goal being to verify that **Aspera on Cloud** services can correctly access the on-premise server and that the certificate is well recognized from internet.
 
-At this point, **Nginx** shall forward requests to the Node API and an API user and transfer user shall be configured.
+At this point, **nginx** shall forward requests to the Node API and an API user and transfer user shall be configured.
 
 Check with:
 
@@ -1144,7 +1153,7 @@ Execute as `root` (Still assuming that `$aspera_hsts_folder/bin/` is in the `PAT
 This command activate reporting of events from Node Daemon to the AEJ Daemon, once Node Daemon is restarted.
 
 ```shell
-asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_local_addr"
+asconfigurator -x "set_server_data;aej_logging,true;aej_port,28000;aej_host,$aspera_node_listen_addr"
 ```
 
 Use the token from previous step in: `registration_token` variable.
@@ -1232,7 +1241,7 @@ This includes:
 
 - installation and configuration of Operating system
 - installation and configuration of Aspera Software
-- installation and configuration of other Software (**Nginx**)
+- installation and configuration of other Software (**nginx**)
 - restoration of state backup
 
 An easy way to prevent disaster, in the case of use of Virtual Machines, is to perform a snapshot of the storage.
@@ -1317,7 +1326,7 @@ getent hosts $aspera_fqdn
 
 #### Storing the certificate and private key
 
-The certificate chain and its key should be stored in a location accessible by **Nginx**.
+The certificate chain and its key should be stored in a location accessible by **nginx**.
 It can be anywhere, including a standard location:
 
 ```shell
@@ -1333,7 +1342,7 @@ Let's store certificate files in standard locations:
 - `/etc/pki/tls/certs/newhost.example.com.fullchain.pem`
 - `/etc/pki/tls/private/newhost.example.com.key.pem`
 
-Let's adjust access rights: By default, **Nginx** runs as user `nginx`
+Let's adjust access rights: By default, **nginx** runs as user `nginx`
 
 ```shell
 eval $(openssl version -d|sed 's/: /=/')
@@ -1347,7 +1356,7 @@ chown nginx: $cert_fullchain_path
 > [!NOTE]
 > The certificate file should contain the full chain.
 
-#### Configuration for **Nginx**
+#### Configuration for **nginx**
 
 Refer to the [Nginx documentation](https://nginx.org/en/docs/http/configuring_https_servers.html).
 
@@ -1525,10 +1534,10 @@ Where:
 
 | Column        | Description                                              |
 |-------------|----------------------------------------------------------|
-| `client`	    | L’identifiant du client (bundle ID ou chemin du binaire) |
-| `client_type`	| 0 = app bundle ID / 1 = chemin absolu                    |
-|	`auth_value`	| 0 = refusé, 1 = demande, 2 = autorisé                    |
-|	`auth_reason`	| Raison (généralement 4 ou 5 = utilisateur)               |
+| `client`     | L’identifiant du client (bundle ID ou chemin du binaire) |
+| `client_type` | 0 = app bundle ID / 1 = chemin absolu                    |
+| `auth_value` | 0 = refusé, 1 = demande, 2 = autorisé                    |
+| `auth_reason` | Raison (généralement 4 ou 5 = utilisateur)               |
 
 To get text instead of numerical and show only allowed:
 
@@ -1547,4 +1556,27 @@ client                            client_type  auth_value  auth_reason
 --------------------------------  -----------  ----------  -----------
 /Library/Aspera/sbin/asperanoded  Path         Allowed     User Choice
 /usr/libexec/sshd-keygen-wrapper  Path         Allowed     User Choice
+```
+
+### Limiting bandwidth use (server side)
+
+Commercial perpetual licenses are capped to a given bandwidth, typically, 100 Mbps, 300 Mbps, 500 Mbps or 1 Gbps.
+Evaluation licenses are not capped.
+To cap an evaluation license, like a commercial one, e.g. for 300 Mbps, execute:
+
+```shell
+sudo /opt/aspera/bin/asconfigurator -x 'set_node_data;transfer_in_bandwidth_flow_target_rate_cap,300000;transfer_in_bandwidth_flow_target_rate_cap,300000'
+```
+
+> [!NOTE]
+> Above command limit individual transfer sessions, but not the global bandwidth use.
+> Speed is in **Kbps**.
+> For example, with a cap at 300 Mbps, two sessions with a target at 300 Mbps may use up to 600 Mbps in total.
+
+In addition, the license is for aggregate bandwidth, so the following configuration ensure that, globally, the sum of all bandwidth used does not exceed the license:
+
+```shell
+sudo /opt/aspera/bin/asconfigurator -x 'set_trunk_data;id,1;trunk_name,in;trunk_capacity,300000;trunk_on,true'
+sudo /opt/aspera/bin/asconfigurator -x 'set_trunk_data;id,2;trunk_name,out;trunk_capacity,300000;trunk_on,true'
+sudo /opt/aspera/bin/asconfigurator -x 'set_node_data;transfer_in_bandwidth_aggregate_trunk_id,1;transfer_out_bandwidth_aggregate_trunk_id,2'
 ```
