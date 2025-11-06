@@ -347,6 +347,20 @@ sudo dnf install -y ruby-devel
 sudo gem install aspera-cli -v 4.24.1
 ```
 
+Check that `ascli` is available in your `PATH`:
+
+```shell
+ascli -v
+```
+
+If that's not the case, remediate this by adapting your `$PATH`.
+For example:
+
+```shell
+echo 'export PATH="$(ruby -r rubygems -e "puts(Gem.bindir)"):$PATH"' >> ~/aspera_installation/aspera_vars.sh
+source ~/aspera_installation/aspera_vars.sh
+```
+
 #### Aspera CLI: **macOS**
 
 Install ruby:
@@ -385,12 +399,12 @@ hdiutil detach /Volumes/$name*
 ### Install the license file
 
 It goes to `$aspera_hsts_folder/etc/aspera-license`.
-This file must be world-readable, or at least readable by `asperadaemons` and transfer users (`xfer`).
+This file must be world-readable, or at least readable by `asperadaemons` and transfer users (later, `xfer`).
 
 ```shell
 sudo cp $aspera_license_file $aspera_hsts_folder/etc/aspera-license
 sudo chmod a+r $aspera_hsts_folder/etc/aspera-license
-sudo -u xfer ascp -A
+ascp -A
 ```
 
 The last command shall display the elements of the installed license file.
@@ -481,6 +495,12 @@ Allows user for ssh:
 
 ```shell
 sudo dseditgroup -o edit -a xfer -t user com.apple.access_ssh
+```
+
+#### Check access to license file
+
+```shell
+sudo -u xfer ascp -A
 ```
 
 ### Define storage location root
