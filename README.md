@@ -19,12 +19,12 @@ This is adapted for evaluations or to use a perpetual license.
 This procedure is especially adapted to set up a self-managed **Aspera High-Speed Transfer Server** (HSTS) or **Aspera High-Speed Transfer Endpoint** (HSTE) as a tethered node to **Aspera on Cloud** (AoC) for a Proof of Concept (PoC) or evaluation.
 
 > [!NOTE]
-> For Aspera Endpoint (HSTE), transfers with Connect Client version 3 is not supported.
-> Also, a special configuration is required (see later)
+> For Aspera Endpoint (HSTE), transfers with Connect Client version 3.x is not supported.
+> Also, an additional configuration step is required (see later).
 
 ### Assumptions
 
-The VM where HSTS will run has a direct internet connection (no forward, no reverse proxy): it can reach internet, and can be reached from internet.
+The system (VM) where HSTS will run has a direct internet connection (no forward, no reverse proxy): it can reach internet, and can be reached from internet.
 If NAT is used for the Node API, then we assume here that the same port is used for external and internal, else both ports shall be listened by **nginx** so that both external and internal users can reach it.
 If proxies are used/needed, then additional configuration can be done, not covered here.
 
@@ -38,9 +38,9 @@ If proxies are used/needed, then additional configuration can be done, not cover
 In order to tether a self-managed node to **Aspera on Cloud**, the following are requited:
 
 - A self-managed **Linux** system with admin (`root`) access (e.g. Rocky 9)
-- [Official hardware requirements](https://www.ibm.com/support/pages/system-sizing-guidelines-aspera-transfer-products), typically 4 cores, 8GB RAM
+- [Official hardware requirements](https://www.ibm.com/support/pages/system-sizing-guidelines-aspera-transfer-products), typically 4 cores, 8 GB RAM
 - A public IP address
-- The server is reachable in this address on a minimum of 2 TCP ports (for Node : 443 and SSH : 33001) and 1 UDP port (for FASP : 33001), so typically TCP/443 TCP/33001 UDP/33001 (configurable)
+- The server is reachable in this address on a minimum of 2 TCP ports (for Node : `443` and SSH : `33001`) and 1 UDP port (for **FASP** : `33001`), so typically TCP/443 TCP/33001 UDP/33001 (configurable)
 - A DNS A record (FQDN) for that IP address (or use a free DNS provider, see later)
 - A TLS certificate for that FQDN (or use a free certificate provider, see later)
 - A license file provided by IBM. For example, an evaluation license file:
@@ -53,7 +53,7 @@ In order to tether a self-managed node to **Aspera on Cloud**, the following are
 
 > [!NOTE]
 > The installation is also possible on other supported OS (macOS, Windows, ...).
-> This manual focusses on Linux.
+> This manual focuses on Linux.
 
 ### Network and ports
 
@@ -63,11 +63,12 @@ In order to work with **Aspera on Cloud**, it is required to have a **public IP 
 |-----------|------------------------------------|
 | TCP/33001 | FASP Session (SSH)                 |
 | UDP/33001 | FASP Data                          |
-| TCP/443   | Node API (HTTPS)                   |
-| TCP/80    | Optional: if `letsencrypt` is used |
+| TCP/443   | Node API (HTTPS)<br/>Optionally HTTPGW, WSS, HTTP Fallback |
+| TCP/80    | Optional: if `letsencrypt` is used with `HTTP‑01` |
 
 > [!NOTE]
-> Let's encrypt can be used on either port 80 or port 443.
+> **Let's encrypt** can be used on either port 80 or port 443.
+> But port 443 is not supported with `certbot`.
 > See later in this document.
 
 ![Network Ports](diagrams.png)
@@ -166,7 +167,7 @@ These parameters are described in the following table.
 | `aspera_node_pass`        | Password for the main node use.                               |
 | `aspera_node_listen_addr` | Address where node can be contacted locally.                  |
 | `aspera_node_listen_port` | The local port where `asperanoded` actually listens.          |
-| `aspera_node_listen_secu` | `s` for HTTPS, and empty for HTTP.<br/>It refers to the local port listened by `asperanoded`. |
+| `aspera_node_listen_secu` | `s` for HTTPS, empty for HTTP.<br/>It refers to the local port listened by `asperanoded`. |
 | `aspera_node_local_url`   | The URL for above parameters.                                 |
 | `aspera_https_local_port` | Local port where HTTPS is acceble from local network, i.e. port of proxy. |
 | `aspera_https_ext_port`   | The external port on which HTTPS will be reachable. Typically, `443`. |
@@ -677,7 +678,7 @@ When parameters for `asperanoded` (Node API server) are modified, one shall rest
 > In case of installation, one can just restart the daemon for config reload.
 
 > [!NOTE]
-> **Linux** only.
+> **Linux** only.<br/>
 > Execute the following command:
 
 ```shell
@@ -685,7 +686,7 @@ sudo systemctl restart asperanoded
 ```
 
 > [!NOTE]
-> **macOS** only.
+> **macOS** only.<br/>
 > Execute the following command:
 
 ```shell
@@ -774,41 +775,52 @@ cert_fullchain_path=$cert_folder/_full_chain_file_
 cert_fullchain_path=$cert_folder/_key_file_
 ```
 
-#### Using **let's encrypt** and `certbot`: Linux
+#### Using **let's encrypt** and `certbot`: Linux (RHEL/Rocky)
 
 > [!NOTE]
-> **Linux** only.
+> **Linux** only.<br/>
+> For below `certbot` command to work, the FQDN shall resolve in DNS and port TCP/443 reachable.
+> Certificate and key are placed here: `/etc/letsencrypt/live/$aspera_fqdn/`.
+> See [Let's encrypt documentation](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
 
 A TLS certificate is required for above FQDN.
 
 If you don't have one, then it is possible to generate one with below procedure using `letsencrypt`:
 
-Install `certbot`:
+Install `certbot` (Rocky):
 
 ```shell
-sudo dnf install -y python3.12
-sudo python3 -m venv /opt/certbot/
-sudo /opt/certbot/bin/pip install --upgrade pip
-sudo /opt/certbot/bin/pip install certbot
-ln -s /opt/certbot/bin/certbot /usr/bin/certbot
+dnf install certbot
 ```
+
+> [!IMPORTANT]
+> The DNF package includes two `systemd` entities: `certbot-renew.timer` and `certbot-renew.service`.
+> Those will automatically renew the certificate.
 
 Generate a certificate:
 
 ```shell
-sudo certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --standalone
+sudo certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --authenticator standalone --deploy-hook "systemctl reload nginx"
+```
+
+> [!NOTE]
+> We use `standalone` here, with default challenge `HTTP-01`, using port `80`.
+> As `nginx` will directly use that certificate, we specify to only signal `nginx` of change with the `reload` command.
+> Once the initial certificate has been generated, one can test further generation with: `certbot renew --dry-run`.
+
+Set up a few variables for later use:
+
+```shell
 cert_folder=/etc/letsencrypt/live/$aspera_fqdn
 cert_fullchain_path=$cert_folder/fullchain.pem
 cert_only_path=$cert_folder/
 cert_privkey_path=$cert_folder/privkey.pem
 ```
 
-> [!NOTE]
-> For above command to work, the FQDN shall resolve in DNS and port TCP/443 reachable.
-> Certificate and key is placed here: `/etc/letsencrypt/live/$aspera_fqdn/`.
-> See [Let's encrypt documentation](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
-
 #### Using **let's encrypt** and `acme.sh`: **macOS**
+
+> [!NOTE]
+> **macOS** only.
 
 ```shell
 brew install acme.sh
@@ -831,7 +843,7 @@ set|grep ^cert_
 ### Not using Nginx
 
 > [!NOTE]
-> **macOS** only.
+> **macOS** only.<br/>
 > [Documentation](https://www.ibm.com/docs/en/ahts/4.4.x?topic=suhna-installing-ssl-certificates-1)
 
 If `asperanoded` is used directly without `nginx`, then a certificate shall be installed:
@@ -877,16 +889,16 @@ cat bundle.cer | awk '/BEGIN CERTIFICATE/{buf=$0 ORS;next}/END CERTIFICATE/{buf=
 Technically, **nginx** is not required, but it is recommended when the Node API faces Internet, and it has several advantages.
 It :
 
-- allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port `443`,
-- simplifies the installation of certificates,
-- adds a security layer with a well-known reverse proxy,
-- allows to use a single port for both Node API and transfers (WSS, if configured) and other services.
+- Allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port `443`,
+- Simplifies the installation of certificates,
+- Adds a security layer with a well-known reverse proxy,
+- Allows using a single port for both Node API and transfers (WSS, if configured) and other services.
 
 #### Change `asperanoded` local port
 
 > [!NOTE]
 > Do this part only if you want to front-end `asperanoded` with nginx
-> and possibly share the HTTPS port between multiple applications
+> and/or share the HTTPS port between multiple applications
 
 Since we will use **nginx** as reverse proxy, we can make Node API listen locally only:
 
@@ -894,11 +906,10 @@ Since we will use **nginx** as reverse proxy, we can make Node API listen locall
 asconfigurator -x "set_server_data;listen,$aspera_node_listen_addr:$aspera_node_listen_port$aspera_node_listen_secu"
 ```
 
-Type `s` is for HTTPS.
 Restart is required to change listening address.
 
 > [!WARNING]
-> **Linux** only.
+> **Linux** only.<br/>
 > Execute the following command:
 
 ```shell
@@ -906,7 +917,7 @@ sudo systemctl restart asperanoded
 ```
 
 > [!WARNING]
-> **macOS** only.
+> **macOS** only.<br/>
 > Execute the following command:
 
 ```shell
