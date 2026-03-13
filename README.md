@@ -13,7 +13,7 @@ The procedure is documented in the **Aspera on Cloud** manual:
 
 The procedure below is similar.
 
-Instead of a metered transfer server license, we use here a license file.
+Rather than a metered license, this guide uses a license file, making it ideal for evaluations or perpetual license setups.
 This is adapted for evaluations or to use a perpetual license.
 
 This procedure is especially adapted to set up a self-managed **Aspera High-Speed Transfer Server** (HSTS) or **Aspera High-Speed Transfer Endpoint** (HSTE) as a tethered node to **Aspera on Cloud** (AoC) for a Proof of Concept (PoC) or evaluation.
@@ -35,12 +35,12 @@ If proxies are used/needed, then additional configuration can be done, not cover
 
 ### Pre-requisites
 
-In order to tether a self-managed node to **Aspera on Cloud**, the following are requited:
+In order to tether a self-managed node to **Aspera on Cloud**, the following are required:
 
 - A self-managed **Linux** system with admin (`root`) access (e.g. Rocky 9)
 - [Official hardware requirements](https://www.ibm.com/support/pages/system-sizing-guidelines-aspera-transfer-products), typically 4 cores, 8 GB RAM
 - A public IP address
-- The server is reachable in this address on a minimum of 2 TCP ports (for Node : `443` and SSH : `33001`) and 1 UDP port (for **FASP** : `33001`), so typically TCP/443 TCP/33001 UDP/33001 (configurable)
+- The server must be reachable at this address via at least two TCP ports (for Node : `443` and SSH : `33001`) and 1 UDP port (for **FASP** : `33001`), so typically TCP/443 TCP/33001 UDP/33001 (configurable)
 - A DNS A record (FQDN) for that IP address (or use a free DNS provider, see later)
 - A TLS certificate for that FQDN (or use a free certificate provider, see later)
 - A license file provided by IBM. For example, an evaluation license file:
@@ -150,8 +150,7 @@ We assume here that a compatible Virtual (or physical) Machine is installed with
 
 ### Installation parameters
 
-The next sections will use parameters that need to be defined.
-These parameters are described in the following table.
+The following sections utilize the parameters defined in the table below.
 
 | Parameter                 | Description                                                   |
 |---------------------------|---------------------------------------------------------------|
@@ -532,7 +531,7 @@ ls: cannot access '...': Permission denied
 
 Then make sure that the `xfer` user can navigate to the folder.
 
-For a quick fix, execute:
+To implement a quick fix, execute:
 
 ```shell
 IFS=/ read -ra P <<< "$(sudo realpath -m "$aspera_storage_root")"
@@ -865,7 +864,7 @@ set|grep ^cert_
 > **macOS** only.<br/>
 > [Documentation](https://www.ibm.com/docs/en/ahts/4.4.x?topic=suhna-installing-ssl-certificates-1)
 
-If `asperanoded` is used directly without `nginx`, then a certificate shall be installed:
+If you choose not to use `nginx` as a reverse proxy, you must install the certificate directly into `asperanoded` as follows:
 
 ```shell
 cert_real_base=$aspera_hsts_folder/etc/real_cert
@@ -1294,7 +1293,7 @@ This includes:
 - installation and configuration of other Software (**nginx**)
 - restoration of state backup
 
-An easy way to prevent disaster, in the case of use of Virtual Machines, is to perform a snapshot of the storage.
+In the case of use of Virtual Machines, to ensure disaster recovery, it is recommended to perform regular storage snapshots.
 
 The installation and configuration of software can even be automated using tools such as Red Hat Ansible and IBM HashiCorp Terraform.
 
