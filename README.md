@@ -780,39 +780,54 @@ cert_fullchain_path=$cert_folder/_key_file_
 > [!NOTE]
 > **Linux** only. (RHEL-based)
 
-**Prerequisites**: The FQDN must resolve in DNS, and port TCP/80 must be reachable for the HTTP-01 challenge.
-
-**Output**: Certificates are stored in `/etc/letsencrypt/live/$aspera_fqdn/`.
-
-**Reference**: [Let's encrypt documentation](https://letsencrypt.org/docs/challenge-types/#http-01-challenge).
-
 A valid TLS certificate is required for the Aspera FQDN.
-If you do not have one, you can generate a free certificate using `certbot`:
+If you do not have one, you can generate a free certificate using [`certbot`](https://eff-certbot.readthedocs.io/en/stable/index.html).
 
-- Install `certbot`
+**Prerequisites**: The FQDN must resolve in DNS, and port TCP/80 must be reachable for the [`HTTP-01` challenge](https://letsencrypt.org/docs/challenge-types/#http-01-challenge).
+
+##### Install `certbot`
 
 ```shell
 dnf install certbot
 ```
 
-> [!IMPORTANT]
-> The DNF package automatically installs `certbot-renew.timer` and `certbot-renew.service` to handle background renewals.
-> Variables in `/etc/sysconfig/certbot`.
+##### Generate the Certificate
 
-- Generate the Certificate
+The default challenge `HTTP-01` is used, using port `80`.
+This port is not used by default, so there is no need to stop any service to free it.
+
+Since Nginx consumes these files directly, the `--deploy-hook` ensures Nginx picks up the new keys without a full restart (it executes: `nginx -s reload`).
 
 ```shell
 sudo certbot certonly --agree-tos --email $aspera_cert_email --domain $aspera_fqdn --non-interactive --authenticator standalone --deploy-hook "systemctl reload nginx"
 ```
 
-> [!TIP]
-> Since Nginx consumes these files directly, the `--deploy-hook` ensures Nginx picks up the new keys without a full restart (it executes: `nginx -s reload`).
-> To verify the renewal pipeline later, run: `sudo certbot renew --dry-run`.
-> The default challenge `HTTP-01` is used, using port `80`.
-> First certificate generation saves the configuration in: `/etc/letsencrypt/renewal/<domain>.conf`.
-> Refer to [`certbot` documentation](https://eff-certbot.readthedocs.io/en/stable/index.html).
+Generated certificates are stored in `/etc/letsencrypt/live/$aspera_fqdn/`.
 
-- Define Certificate Paths in current shell to build Nginx' configuration file.
+This first certificate generation saves the configuration in: `/etc/letsencrypt/renewal/<domain>.conf`.
+It contains the list of arguments used, so that it is not necessary to provide again for the renewal.
+
+##### Automated Renewal
+
+The `certbot` package automatically installs `certbot-renew.timer` and `certbot-renew.service` to handle [automatic background renewals](https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates).
+
+Variables in `/etc/sysconfig/certbot` can be set for the service startup.
+
+To verify the renewal pipeline later, run:
+
+```shell
+sudo certbot renew --dry-run
+```
+
+Check that the renewal service and timer are active:
+
+```shell
+systemctl status certbot-renew.{service,timer}
+```
+
+##### Certificate Paths
+
+Define certificate paths in current shell to the build Nginx configuration file.
 
 ```shell
 cert_folder=/etc/letsencrypt/live/$aspera_fqdn
@@ -893,9 +908,9 @@ cat bundle.cer | awk '/BEGIN CERTIFICATE/{buf=$0 ORS;next}/END CERTIFICATE/{buf=
 Technically, **nginx** is not required, but it is recommended when the Node API faces Internet, and it has several advantages.
 It :
 
-- Allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port `443`,
-- Simplifies the installation of certificates,
-- Adds a security layer with a well-known reverse proxy,
+- Allows using port 443 for HTTPS, as `asperanoded` runs as user `asperadaemon` and cannot bind to port `443`.
+- Simplifies the installation of certificates.
+- Adds a security layer with a well-known reverse proxy.
 - Allows using a single port for both Node API and transfers (WSS, if configured) and other services.
 
 #### Change `asperanoded` local port
