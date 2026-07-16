@@ -1583,10 +1583,10 @@ Where:
 
 | Column        | Description                                              |
 |-------------|----------------------------------------------------------|
-| `client`     | L’identifiant du client (bundle ID ou chemin du binaire) |
-| `client_type` | 0 = app bundle ID / 1 = chemin absolu                    |
-| `auth_value` | 0 = refusé, 1 = demande, 2 = autorisé                    |
-| `auth_reason` | Raison (généralement 4 ou 5 = utilisateur)               |
+| `client`     | The client identifier (bundle ID or binary path)         |
+| `client_type` | 0 = app bundle ID / 1 = absolute path                    |
+| `auth_value` | 0 = denied, 1 = ask, 2 = allowed                         |
+| `auth_reason` | Reason (usually 4 or 5 = user)                           |
 
 To get text instead of numerical and show only allowed:
 
